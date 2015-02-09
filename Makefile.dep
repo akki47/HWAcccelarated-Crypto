@@ -1,0 +1,33 @@
+objs/bn_kn.o: bn_kn.cu bn_kn.h
+
+bn_kn.h:
+objs/co_aes_sha1.o: co_aes_sha1.cu aes_core.h sha1.h co_aes_sha1.h
+
+aes_core.h:
+
+sha1.h:
+
+co_aes_sha1.h:
+objs/rsa_cuda.o: rsa_cuda.cu rsa_cuda.h bn_kn.h
+
+rsa_cuda.h:
+
+bn_kn.h:
+objs/crypto_context.o: crypto_context.c crypto_context.h device_context.h \
+ crypto_mem.h crypto_kernel.h co_aes_sha1.h
+
+crypto_context.h:
+
+device_context.h:
+
+crypto_mem.h:
+
+crypto_kernel.h:
+
+co_aes_sha1.h:
+objs/crypto_mem.o: crypto_mem.c
+objs/device_context.o: device_context.c device_context.h crypto_mem.h
+
+device_context.h:
+
+crypto_mem.h:
