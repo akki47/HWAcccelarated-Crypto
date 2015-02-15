@@ -89,14 +89,14 @@ TARGET_DIR = lib
 TARGET_FILE = libgpucrypto.a
 TARGET = $(addprefix $(TARGET_DIR)/, $(TARGET_FILE))
 
-.SUFFIXES : .cu .c .o
+.SUFFIXES : .cu .cc .o
 
 CU_SRC_FILES = $(wildcard *.cu)
-CC_SRC_FILES = $(wildcard *.c)
-HEADER_FILES = $(wildcard *.h) $(wildcard *.h)
+CC_SRC_FILES = $(wildcard *.cc)
+HEADER_FILES = $(wildcard *.hh) $(wildcard *.h)
 
 SRC_FILES = $(CU_SRC_FILES) $(CC_SRC_FILES)
-OBJS_FILE = $(CU_SRC_FILES:.cu=.o) $(CC_SRC_FILES:.c=.o)
+OBJS_FILE = $(CU_SRC_FILES:.cu=.o) $(CC_SRC_FILES:.cc=.o)
 
 OBJS = $(addprefix $(OBJS_DIR)/, $(OBJS_FILE))
 DEPS = Makefile.dep
@@ -115,7 +115,7 @@ $(OBJS_DIR):
 $(DEPS): $(SRC_FILES) $(HEADER_FILES)
 	$(CC) -MM -MP -x c++ $(CU_SRC_FILES) $(CC_SRC_FILES) | sed 's![^:]*.o:!objs/&!g' > Makefile.dep
 
-$(OBJS_DIR)/%.o : %.c
+$(OBJS_DIR)/%.o : %.cc
 	$(GCC) $(CCFLAGS) $(NVCCINCLUDES) -c $< -o $@
 
 $(OBJS_DIR)/%.o : %.cu
