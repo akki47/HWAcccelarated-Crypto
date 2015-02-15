@@ -24,8 +24,33 @@ public:
 	virtual void priv_decrypt(unsigned char *out, int *out_len,
 			const unsigned char *in, int in_len);
 	virtual void priv_decrypt_batch(unsigned char **out, int *out_len,
-			const unsigned char **in, const int *in_len, 
+			const unsigned char **in, const int *in_len,
 			int n);
+
+	/**
+	 * Verify the signature with RSA algorithm using private key.
+	 *
+	 * @param m message.
+	 * @param m_len message length.
+	 * @param sigret Signature of the message.
+	 * @param siglen Length of the signature.
+	 */
+	virtual int RSA_verify(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen);
+
+	/**
+	 *  Verify the signature with RSA algorithm using private key.
+	 *
+	 * @param m message.
+	 * @param m_len message length.
+	 * @param sigret Signature of the message.
+	 * @param siglen Length of the signature.
+	 * @param n Ciphertexts count.
+	 */
+	virtual int RSA_verify_batch(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen,
+			int n);
+
 protected:
 
 private:
