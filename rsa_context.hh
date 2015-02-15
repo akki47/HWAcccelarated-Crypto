@@ -104,6 +104,41 @@ public:
 	virtual void priv_decrypt_batch(unsigned char **out, int *out_len,
 			const unsigned char **in, const int *in_len,
 			int n);
+			
+	/**
+	 * Sign the message with RSA algorithm using public key.
+	 *
+	 * @param m message.
+	 * @param m_len message length.
+	 * @param sigret Signature of the message.
+	 * @param siglen Length of the signature.
+	 */
+	virtual int RSA_sign(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigret, unsigned int *siglen);
+			
+	/**
+	 * Verify the signature with RSA algorithm using private key.
+	 *
+	 * @param m message.
+	 * @param m_len message length.
+	 * @param sigret Signature of the message.
+	 * @param siglen Length of the signature.
+	 */
+	virtual int RSA_verify(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen);
+
+	/**
+	 *  Verify the signature with RSA algorithm using private key.
+	 *
+	 * @param m message.
+	 * @param m_len message length.
+	 * @param sigret Signature of the message.
+	 * @param siglen Length of the signature.
+	 * @param n Ciphertexts count.
+	 */
+	virtual int RSA_verify_batch(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen,
+			int n);
 
 	float get_elapsed_ms_kernel();
 
