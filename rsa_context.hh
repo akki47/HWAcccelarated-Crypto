@@ -114,7 +114,7 @@ public:
 	 * @param siglen Length of the signature.
 	 */
 	virtual int RSA_sign_message(const unsigned char *m, unsigned int m_len,
-    			unsigned char *sigret, unsigned int *siglen);
+    			unsigned char *sigret, unsigned int siglen);
 
 	/**
 	 * Verify the signature with RSA algorithm using private key.
@@ -136,8 +136,8 @@ public:
 	 * @param siglen Length of the signature.
 	 * @param n Ciphertexts count.
 	 */
-	virtual int RSA_verify_message_batch(const unsigned char *m, unsigned int m_len,
-    			const unsigned char *sigbuf, unsigned int siglen,
+	virtual int RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
+    			const unsigned char **sigbuf, unsigned int *siglen,
 			int n);
 
 	float get_elapsed_ms_kernel();

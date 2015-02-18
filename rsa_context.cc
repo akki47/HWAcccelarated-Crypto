@@ -150,22 +150,22 @@ void rsa_context::priv_decrypt_batch(unsigned char **out, int *out_len,
 }
 
 int rsa_context::RSA_sign_message(const unsigned char *m, unsigned int m_len,
-    			unsigned char *sigret, unsigned int *siglen)
+    			unsigned char *sigret, unsigned int siglen)
 {
-    int success = 0
+    	int success = 0;
 	int bytes_needed = get_key_bits() / 8;
-	assert(*sigret >= bytes_needed);
+	//assert(*sigret >= bytes_needed);
 
-	assert(m <= max_ptext_bytes());
+	assert(m_len <= max_ptext_bytes());
 
-    success = RSA_sign(*m, m_len, *sigret, siglen);
+        success = RSA_sign(NID_sha1, m, m_len, sigret, &siglen, rsa);
 
 	//*out_len = RSA_public_encrypt(in_len, in, out, rsa, RSA_PKCS1_PADDING);
 	assert(success != 0);
 }
 
 int rsa_context::RSA_verify_message(const unsigned char *m, unsigned int m_len,
-    			const unsigned char *sigbuf, unsigned int siglen)
+    			const unsigned char *sigret, unsigned int siglen)
 {
 #if 0
 	if (is_crt_available()) {
@@ -198,13 +198,13 @@ int rsa_context::RSA_verify_message(const unsigned char *m, unsigned int m_len,
 		BN_free(t);
 	} else {
 #endif
-        int success = 0
+        int success = 0;
         int bytes_needed = get_key_bits() / 8;
-        assert(*sigret >= bytes_needed);
+        //assert(*sigret >= bytes_needed);
 
-        assert(m <= max_ptext_bytes());
+        assert(m_len <= max_ptext_bytes());
 
-        success = RSA_verify(*m, m_len, *sigret, siglen);
+        success = RSA_verify(NID_sha1, m, m_len, sigret, siglen, rsa);
 
         assert(success != 0);
 //		int bytes_needed = get_key_bits() / 8;
@@ -218,14 +218,14 @@ int rsa_context::RSA_verify_message(const unsigned char *m, unsigned int m_len,
 #endif
 }
 
-int rsa_context::RSA_verify_message_batch(const unsigned char *m, unsigned int m_len,
-    			const unsigned char *sigbuf, unsigned int siglen,
+int rsa_context::RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
+    			const unsigned char **sigbuf, unsigned int *siglen,
 			int n)
 {
 	assert(0 < n && n <= max_batch);
 
 	for (int i = 0; i < n; i++)
-		RSA_verify(m[i], m_len[i], sigbuf[i], siglen[i]); //out[i], &out_len[i], in[i], in_len[i]);
+		RSA_verify_message(m[i], m_len[i], sigbuf[i], siglen[i]); //out[i], &out_len[i], in[i], in_len[i]);
 }
 
 float rsa_context::get_elapsed_ms_kernel()
@@ -276,7 +276,7 @@ void rsa_context::set_crt()
 			);
 
 // turn this on to disable CRT
-#if 0
+#if 1
 	crt_available = false;
 #endif
 
