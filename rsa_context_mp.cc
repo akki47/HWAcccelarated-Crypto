@@ -129,6 +129,73 @@ void rsa_context_mp::priv_decrypt_stream(unsigned char **out, int *out_len,
 	streams[stream_id].out_len = out_len;
 }
 
+
+void rsa_context_mp::RSA_verify_message(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen)
+{
+    RSA_verify_message_batch(&m, m_len, &sigbuf, &siglen, 1);
+}
+
+void rsa_context_mp::RSA_verify_message_batch(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen,
+			int n)
+{
+	// by default, stream is not used
+	RSA_verify_message_stream(m, m_len, sigbuf, siglen, n, 0);
+	sync(0);
+}
+
+void rsa_context_mp::RSA_verify_message_stream(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen,
+			int n, unsigned int stream_id)
+{
+	assert(is_crt_available());
+	assert(0 < n && n <= max_batch);
+	assert(n <= MP_MAX_NUM_PAIRS);
+	assert(stream_id <= max_stream);
+	assert(dev_ctx_ != NULL);
+	assert(dev_ctx_->get_state(stream_id) == READY);
+	dev_ctx_->set_state(stream_id, WAIT_KERNEL);
+
+	int word_len = (get_key_bits() / 2) / BITS_PER_WORD;
+	int S = word_len;
+	int num_blks = ((n + MP_MSGS_PER_BLOCK - 1) / MP_MSGS_PER_BLOCK) * 2;
+	dev_ctx_->clear_checkbits(stream_id, num_blks);
+	streams[stream_id].post_launched = false;
+
+	for (int i = 0; i < n; i++) {
+		BN_bin2bn(m[i], m_len[i], in_bn_p);
+		BN_bin2bn(m[i], m_len[i], in_bn_q);
+		assert(in_bn_p != NULL);
+		assert(in_bn_q != NULL);
+
+		//assert(BN_cmp(in_bn_p, rsa->n) < 0);
+
+		BN_nnmod(in_bn_p, in_bn_p, rsa->p, bn_ctx);	// TODO: test BN_nnmod
+		BN_nnmod(in_bn_q, in_bn_q, rsa->q, bn_ctx);
+
+		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S), in_bn_p, word_len);
+		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S) + MAX_S, in_bn_q, word_len);
+	}
+
+	//copy in put and execute kernel
+	mp_modexp_crt(streams[stream_id].a,
+			n, word_len,
+			streams[stream_id].ret_d, streams[stream_id].a_d,
+			sw_d,
+			n_d,
+			np_d,
+			r_sqr_d,
+		      dev_ctx_->get_stream(stream_id),
+		      stream_id,
+		      dev_ctx_->get_dev_checkbits(stream_id));
+
+
+	streams[stream_id].n = n;
+	streams[stream_id].sigbuf = sigbuf;
+	streams[stream_id].siglen = siglen;
+}
+
 bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 {
 	assert(stream_id <= max_stream);

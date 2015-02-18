@@ -91,18 +91,6 @@ public:
 			const unsigned char **in, const int *in_len,
 			int n, unsigned int stream_id);
 
-
-	/**
-	 * Sign the message with RSA algorithm using public key.
-	 *
-	 * @param m message.
-	 * @param m_len message length.
-	 * @param sigret Signature of the message.
-	 * @param siglen Length of the signature.
-	 */
-	virtual int RSA_sign(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigret, unsigned int *siglen);
-
 	/**
 	 * Verify the signature with RSA algorithm using private key.
 	 *
@@ -111,7 +99,7 @@ public:
 	 * @param sigret Signature of the message.
 	 * @param siglen Length of the signature.
 	 */
-	virtual int RSA_verify(unsigned char *m, unsigned int m_len,
+	virtual int RSA_verify_message(unsigned char *m, unsigned int m_len,
     			unsigned char *sigbuf, unsigned int siglen);
 
 	/**
@@ -123,7 +111,7 @@ public:
 	 * @param siglen Length of the signature.
 	 * @param n Ciphertexts count.
 	 */
-	virtual int RSA_verify_batch(unsigned char *m, unsigned int m_len,
+	virtual int RSA_verify_message_batch(unsigned char *m, unsigned int m_len,
     			unsigned char *sigbuf, unsigned int siglen,
 			int n);
 
@@ -139,7 +127,7 @@ public:
 	 * @param stream_id Stream index. 1 <= stream_id <= max_stream
 	 */
 
-	void RSA_verify_stream(unsigned char *m, unsigned int m_len,
+	void RSA_verify_message_stream(unsigned char *m, unsigned int m_len,
     			unsigned char *sigbuf, unsigned int siglen,
 			int n, unsigned int stream_id);
 

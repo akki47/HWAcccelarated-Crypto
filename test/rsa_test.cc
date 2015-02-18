@@ -27,6 +27,7 @@ unsigned char dtext_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch][
 int dtext_len_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
 unsigned char *ctext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
 unsigned char *dtext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
+unsigned char *ptext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
 
 static void test_correctness(rsa_context *rsa, int iteration)
 {
@@ -290,7 +291,7 @@ static void test_latency_stream(rsa_context_mp *rsa, device_context *dev_ctx, in
 static void sign_test_correctness(rsa_context *rsa, int iteration)
 {
     int max_len = rsa->max_ptext_bytes();
-
+    int signatureVerified = 0;
     /* step 1: no batch, static text */
     printf("correctness check (no batch): ");
     fflush(stdout);
@@ -298,13 +299,14 @@ static void sign_test_correctness(rsa_context *rsa, int iteration)
     strcpy((char *)ptext[0], "hello world, hello RSA");
     ptext_len[0] = strlen((char *)ptext[0]) + 1;
     ctext_len[0] = sizeof(ctext[0]);
-    dtext_len[0] = sizeof(dtext[0]);
+    //dtext_len[0] = sizeof(dtext[0]);
 
-    rsa->RSA_sign(ctext[0], &ctext_len[0], ptext[0], ptext_len[0]);
-    rsa->RSA_verify(dtext[0], &dtext_len[0], ctext[0], ctext_len[0]);
+    rsa->RSA_sign(ptext[0], ptext_len[0], ctext[0], &ctext_len[0]);
+    signatureVerified = rsa->RSA_verify(ptext[0], ptext_len[0], ctext[0], ctext_len[0]);
 
-    assert(dtext_len[0] == ptext_len[0]);
-    assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
+    assert(signatureVerified = 1);
+    //assert(dtext_len[0] == ptext_len[0]);
+    //assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
 
     printf("OK\n");
 
@@ -316,14 +318,18 @@ static void sign_test_correctness(rsa_context *rsa, int iteration)
     {
         ptext_len[0] = (rand() % max_len) + 1;
         ctext_len[0] = sizeof(ctext[0]);
-        dtext_len[0] = sizeof(dtext[0]);
+        //dtext_len[0] = sizeof(dtext[0]);
         set_random(ptext[0], ptext_len[0]);
 
-        rsa->pub_encrypt(ctext[0], &ctext_len[0], ptext[0], ptext_len[0]);
-        rsa->priv_decrypt(dtext[0], &dtext_len[0], ctext[0], ctext_len[0]);
+        rsa->RSA_sign(ptext[0], ptext_len[0], ctext[0], &ctext_len[0]);
 
-        assert(dtext_len[0] == ptext_len[0]);
-        assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
+        signatureVerified = 0;
+        signatureVerified = rsa->RSA_verify(ptext[0], ptext_len[0], ctext[0], &ctext_len[0]);
+
+        //assert(dtext_len[0] == ptext_len[0]);
+        //assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
+        assert(signatureVerified = 1);
+
         printf(".");
         fflush(stdout);
     }
@@ -343,25 +349,25 @@ static void sign_test_correctness(rsa_context *rsa, int iteration)
         {
             ptext_len[i] = (rand() % max_len) + 1;
             ctext_len[i] = sizeof(ctext[i]);
-            dtext_len[i] = sizeof(dtext[i]);
+            //dtext_len[i] = sizeof(dtext[i]);
             set_random(ptext[i], ptext_len[i]);
 
-            rsa->pub_encrypt(ctext[i], &ctext_len[i],
-                             ptext[i], ptext_len[i]);
 
-            dtext_arr[i] = dtext[i];
+            rsa->RSA_sign(ptext[i], ptext_len[i], ctext[i], &ctext_len[i]);
+
+            ptext_arr[i] = ptext[i];
             ctext_arr[i] = ctext[i];
         }
 
-        rsa->priv_decrypt_batch((unsigned char **)dtext_arr, dtext_len,
+        signatureVerified = 0;
+        signatureVerified = rsa->RSA_verify_batch((unsigned char **)ptext_arr, ptext_len,
                                 (const unsigned char **)ctext_arr, ctext_len,
                                 k);
 
         bool correct = true;
         for (int i = 0; i < k; i++)
         {
-            if (dtext_len[i] != ptext_len[i] ||
-                    memcmp(dtext[i], ptext[i], dtext_len[i]) != 0)
+            if (signatureVerified = 1)
             {
                 correct = false;
             }
@@ -397,6 +403,7 @@ static void sign_test_latency(rsa_context *rsa)
         //	k = 30; 	// GTX285 has 30 SMs :)
 
         unsigned char *ctext_arr[rsa_context::max_batch];
+        unsigned char *ptext_arr[rsa_context::max_batch];
         unsigned char *dtext_arr[rsa_context::max_batch];
 
         uint64_t begin;
@@ -406,29 +413,31 @@ static void sign_test_latency(rsa_context *rsa)
         {
             ptext_len[i] = (rand() % max_len) + 1;
             ctext_len[i] = sizeof(ctext[i]);
-            dtext_len[i] = sizeof(dtext[i]);
+            //dtext_len[i] = sizeof(dtext[i]);
+
             set_random(ptext[i], ptext_len[i]);
 
             rsa->RSA_sign(ptext[i], ptext_len[i],
-                            ctext[i], &ctext_len[i],);
+                            ctext[i], &ctext_len[i]);
 
-            dtext_arr[i] = dtext[i];
+            ptext_arr[i] = ptext[i];
             ctext_arr[i] = ctext[i];
+            //dtext_arr[i] = dtext[i];
         }
 
 again:
         int iteration = 1;
         begin = get_usec();
 try_more:
-        rsa->RSA_verify((unsigned char **)dtext_arr, dtext_len,
-                                (const unsigned char **)ctext_arr, ctext_len,
+        rsa->RSA_verify_batch((const unsigned char **)ptext_arr, ptext_len,
+                                (unsigned char **)ctext_arr, ctext_len ,
                                 k);
 
         end = get_usec();
         if (end - begin < 300000)
         {
-            for (int i = 0; i < k; i++)
-                dtext_len[i] = sizeof(dtext[i]);
+            //for (int i = 0; i < k; i++)
+            //    dtext_len[i] = sizeof(dtext[i]);
             iteration++;
 
             if (!warmed_up)
@@ -475,11 +484,14 @@ static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ct
                 dtext_len_str[s][i] = sizeof(dtext_str[s][i]);
                 set_random(ptext_str[s][i], ptext_len_str[s][i]);
 
-                rsa->pub_encrypt(ctext_str[s][i], &ctext_len_str[s][i],
-                                 ptext_str[s][i], ptext_len_str[s][i]);
+                rsa->RSA_sign(ptext_str[s][i], ptext_len_str[s][i],
+                            ctext_str[s][i], &ctext_len_str[s][i]);
+
 
                 dtext_arr_str[s][i] = dtext_str[s][i];
                 ctext_arr_str[s][i] = ctext_str[s][i];
+                ptext_arr_str[s][i] = ptext_str[s][i];
+
             }
         }
 
@@ -488,10 +500,14 @@ static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ct
         //warmup
         for (int i = 1; i < concurrency; i++)
         {
-            rsa->priv_decrypt_stream((unsigned char **)dtext_arr_str[i],
-                                     dtext_len_str[i],
-                                     (const unsigned char **)ctext_arr_str[i],
-                                     ctext_len_str[i], k, i);
+            rsa->RSA_verify_stream((const unsigned char **)ptext_arr_str[i], ptext_len_str[i],
+                                (unsigned char **)ctext_arr_str[i], ctext_len_str[i],
+                                k, i);
+
+            //rsa->priv_decrypt_stream((unsigned char **)dtext_arr_str[i],
+            //                         dtext_len_str[i],
+            //                         (const unsigned char **)ctext_arr_str[i],
+            //                         ctext_len_str[i], k, i);
             rsa->sync(i, true);
         }
 
@@ -520,10 +536,9 @@ static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ct
             }
             if (stream != 0)
             {
-                rsa->priv_decrypt_stream((unsigned char **)dtext_arr_str[stream],
-                                         dtext_len_str[stream],
-                                         (const unsigned char **)ctext_arr_str[stream],
-                                         ctext_len_str[stream], k, stream);
+                rsa->RSA_verify_stream((const unsigned char **)ptext_arr_str[stream], ptext_len_str[stream],
+                                (unsigned char **)ctext_arr_str[stream], ctext_len_str[stream],
+                                k, stream);
             }
             else
             {

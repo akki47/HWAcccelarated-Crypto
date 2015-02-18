@@ -8,7 +8,7 @@ rsa_context_rns::rsa_context_rns(int keylen)
 	gpu_setup();
 }
 
-rsa_context_rns::rsa_context_rns(const std::string &filename, 
+rsa_context_rns::rsa_context_rns(const std::string &filename,
 		const std::string &passwd)
 	: rsa_context(filename, passwd)
 {
@@ -32,7 +32,7 @@ void rsa_context_rns::dump()
 	for (int i = 0; i < (is_crt_available() ? 2 : 1); i++) {
 		RNS_CTX *ctx = rns_ctx[i];
 
-		printf("RNS_CTX %d: # of base elements = %d/%d\n", 
+		printf("RNS_CTX %d: # of base elements = %d/%d\n",
 				i, ctx->bs, MAX_BS);
 
 		printf("A = {");
@@ -57,14 +57,14 @@ void rsa_context_rns::dump()
 	rsa_context::dump();
 }
 
-void rsa_context_rns::priv_decrypt(unsigned char *out, int *out_len, 
+void rsa_context_rns::priv_decrypt(unsigned char *out, int *out_len,
 		const unsigned char *in, int in_len)
 {
 	priv_decrypt_batch(&out, out_len, &in, &in_len, 1);
 }
 
 void rsa_context_rns::priv_decrypt_batch(unsigned char **out, int *out_len,
-		const unsigned char **in, const int *in_len, 
+		const unsigned char **in, const int *in_len,
 		int n)
 {
 	assert(0 < n && n <= max_batch);
@@ -107,11 +107,11 @@ void rsa_context_rns::priv_decrypt_batch(unsigned char **out, int *out_len,
 
 			if (BN_num_bits(out_bn[p]) > p_bits ||
 					BN_num_bits(out_bn[q]) > q_bits) {
-				fprintf(stderr, "failed: %.3fms\n", 
+				fprintf(stderr, "failed: %.3fms\n",
 						elapsed_ms_kernel);
 				// fallback. necessary?
 				assert(false);
-				rsa_context::priv_decrypt(out[i], &out_len[i], 
+				rsa_context::priv_decrypt(out[i], &out_len[i],
 						in[i], in_len[i]);
 			} else {
 				BN_sub(t, out_bn[p], out_bn[q]);
@@ -121,7 +121,7 @@ void rsa_context_rns::priv_decrypt_batch(unsigned char **out, int *out_len,
 
 				int ret = remove_padding(out[i], &out_len[i], t);
 				assert(ret != -1);
-				
+
 				BN_free(in_bn[p]);
 				BN_free(in_bn[q]);
 				BN_free(out_bn[p]);
@@ -151,14 +151,127 @@ void rsa_context_rns::priv_decrypt_batch(unsigned char **out, int *out_len,
 
 		for (int i = 0; i < n; i++) {
 			if (BN_num_bits(out_bn[i]) > n_bits) {
-				fprintf(stderr, "failed: %.3fms\n", 
+				fprintf(stderr, "failed: %.3fms\n",
 						elapsed_ms_kernel);
 				// fallback. necessary?
 				assert(false);
-				rsa_context::priv_decrypt(out[i], &out_len[i], 
+				rsa_context::priv_decrypt(out[i], &out_len[i],
 						in[i], in_len[i]);
 			} else {
 				int ret = remove_padding(out[i], &out_len[i], out_bn[i]);
+				assert(ret != -1);
+
+				BN_free(in_bn[i]);
+				BN_free(out_bn[i]);
+			}
+		}
+	}
+}
+
+
+int rsa_context_rns::RSA_verify_message(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen)
+{
+	RSA_verify_message_batch(&m, m_len, &sigbuf, &siglen, 1);
+}
+
+int rsa_context_rns::RSA_verify_message_batch(unsigned char *m, unsigned int m_len,
+    			unsigned char *sigbuf, unsigned int siglen,
+			int n)
+{
+	assert(0 < n && n <= max_batch);
+
+	if (is_crt_available()) {
+		BIGNUM *in_bn[max_batch * 2];
+		BIGNUM *out_bn[max_batch * 2];
+		RNS_CTX *ctx[max_batch * 2];
+		BIGNUM *t = BN_new();
+
+		for (int i = 0; i < n; i++) {
+			int p = i;
+			int q = n + i;
+
+			in_bn[p] = BN_bin2bn(m[i], m_len[i], NULL);
+			in_bn[q] = BN_bin2bn(m[i], m_len[i], NULL);
+			out_bn[p] = BN_new();
+			out_bn[q] = BN_new();
+			ctx[p] = rns_ctx[0];
+			ctx[q] = rns_ctx[1];
+
+			assert(in_bn[p] != NULL);
+			assert(in_bn[q] != NULL);
+			assert(out_bn[p] != NULL);
+			assert(out_bn[q] != NULL);
+			assert(BN_cmp(in_bn[p], rsa->n) == -1);
+
+			BN_nnmod(in_bn[p], in_bn[p], rsa->p, bn_ctx);
+			BN_nnmod(in_bn[q], in_bn[q], rsa->q, bn_ctx);
+		}
+
+		BN_mod_exp_mont_batch_cu(out_bn, in_bn, n * 2, ctx);
+
+		int p_bits = BN_num_bits(rsa->p);
+		int q_bits = BN_num_bits(rsa->q);
+
+		for (int i = 0; i < n; i++) {
+			int p = i;
+			int q = n + i;
+
+			if (BN_num_bits(out_bn[p]) > p_bits ||
+					BN_num_bits(out_bn[q]) > q_bits) {
+				fprintf(stderr, "failed: %.3fms\n",
+						elapsed_ms_kernel);
+				// fallback. necessary?
+				assert(false);
+				rsa_context::RSA_verify_message(m[i], m_len[i],
+                                    sigbuf[i], &siglen[i]);
+
+			} else {
+				BN_sub(t, out_bn[p], out_bn[q]);
+				BN_mod_mul(t, t, rsa->iqmp, rsa->p, bn_ctx);
+				BN_mul(t, t, rsa->q, bn_ctx);
+				BN_add(t, out_bn[q], t);
+
+				int ret = remove_padding(sigbuf[i], &siglen[i], t);
+				assert(ret != -1);
+
+				BN_free(in_bn[p]);
+				BN_free(in_bn[q]);
+				BN_free(out_bn[p]);
+				BN_free(out_bn[q]);
+			}
+		}
+
+		BN_free(t);
+	} else {
+		BIGNUM *in_bn[max_batch];
+		BIGNUM *out_bn[max_batch];
+		RNS_CTX *ctx[max_batch];
+
+		for (int i = 0; i < n; i++) {
+			in_bn[i] = BN_bin2bn(m[i], m_len[i], NULL);
+			out_bn[i] = BN_new();
+			ctx[i] = rns_ctx[0];
+
+			assert(in_bn[i] != NULL);
+			assert(out_bn[i] != NULL);
+			assert(BN_cmp(in_bn[i], rsa->n) == -1);
+		}
+
+		BN_mod_exp_mont_batch_cu(out_bn, in_bn, n, ctx);
+
+		int n_bits = BN_num_bits(rsa->n);
+
+		for (int i = 0; i < n; i++) {
+			if (BN_num_bits(out_bn[i]) > n_bits) {
+				fprintf(stderr, "failed: %.3fms\n",
+						elapsed_ms_kernel);
+				// fallback. necessary?
+				assert(false);
+				rsa_context::RSA_verify_message(m[i], m_len[i],
+                                    sigbuf[i], &siglen[i]);
+			} else {
+				int ret = remove_padding(sigbuf[i], &siglen[i], out_bn[i]);
 				assert(ret != -1);
 
 				BN_free(in_bn[i]);

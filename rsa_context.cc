@@ -82,7 +82,7 @@ void rsa_context::dump()
 	}
 }
 
-void rsa_context::pub_encrypt(unsigned char *out, int *out_len, 
+void rsa_context::pub_encrypt(unsigned char *out, int *out_len,
 		const unsigned char *in, int in_len)
 {
 	int bytes_needed = get_key_bits() / 8;
@@ -94,7 +94,7 @@ void rsa_context::pub_encrypt(unsigned char *out, int *out_len,
 	assert(*out_len != -1);
 }
 
-void rsa_context::priv_decrypt(unsigned char *out, int *out_len, 
+void rsa_context::priv_decrypt(unsigned char *out, int *out_len,
 		const unsigned char *in, int in_len)
 {
 #if 0
@@ -113,7 +113,7 @@ void rsa_context::priv_decrypt(unsigned char *out, int *out_len,
 		BN_mod_exp(m1, t, rsa->dmp1, rsa->p, bn_ctx);
 		BN_nnmod(t, c, rsa->q, bn_ctx);
 		BN_mod_exp(m2, t, rsa->dmq1, rsa->q, bn_ctx);
-		
+
 		BN_sub(t, m1, m2);
 		BN_mod_mul(t, t, rsa->iqmp, rsa->p, bn_ctx);
 		BN_mul(t, t, rsa->q, bn_ctx);
@@ -131,7 +131,7 @@ void rsa_context::priv_decrypt(unsigned char *out, int *out_len,
 		int bytes_needed = get_key_bits() / 8;
 		assert(*out_len >= bytes_needed);
 
-		*out_len = RSA_private_decrypt(in_len, in, out, rsa, 
+		*out_len = RSA_private_decrypt(in_len, in, out, rsa,
 				RSA_PKCS1_PADDING);
 		assert(*out_len != -1);
 #if 0
@@ -147,6 +147,85 @@ void rsa_context::priv_decrypt_batch(unsigned char **out, int *out_len,
 
 	for (int i = 0; i < n; i++)
 		priv_decrypt(out[i], &out_len[i], in[i], in_len[i]);
+}
+
+int rsa_context::RSA_sign_message(const unsigned char *m, unsigned int m_len,
+    			unsigned char *sigret, unsigned int *siglen)
+{
+    int success = 0
+	int bytes_needed = get_key_bits() / 8;
+	assert(*sigret >= bytes_needed);
+
+	assert(m <= max_ptext_bytes());
+
+    success = RSA_sign(*m, m_len, *sigret, siglen);
+
+	//*out_len = RSA_public_encrypt(in_len, in, out, rsa, RSA_PKCS1_PADDING);
+	assert(success != 0);
+}
+
+int rsa_context::RSA_verify_message(const unsigned char *m, unsigned int m_len,
+    			const unsigned char *sigbuf, unsigned int siglen)
+{
+#if 0
+	if (is_crt_available()) {
+		// This is only for debugging purpose.
+		// RSA_private_decrypt() is enough.
+		BIGNUM *c = BN_bin2bn(m, m_len, NULL);
+		assert(c != NULL);
+		assert(BN_cmp(c, rsa->n) == -1);
+
+		BIGNUM *m1 = BN_new();
+		BIGNUM *m2 = BN_new();
+		BIGNUM *t = BN_new();
+
+		BN_nnmod(t, c, rsa->p, bn_ctx);
+		BN_mod_exp(m1, t, rsa->dmp1, rsa->p, bn_ctx);
+		BN_nnmod(t, c, rsa->q, bn_ctx);
+		BN_mod_exp(m2, t, rsa->dmq1, rsa->q, bn_ctx);
+
+		BN_sub(t, m1, m2);
+		BN_mod_mul(t, t, rsa->iqmp, rsa->p, bn_ctx);
+		BN_mul(t, t, rsa->q, bn_ctx);
+		BN_add(t, m2, t);
+
+		int ret = remove_padding(sigbuf, sig_len, t);
+		assert(ret != -1);
+
+		BN_free(c);
+		BN_free(m1);
+		BN_free(m2);
+		BN_free(t);
+	} else {
+#endif
+        int success = 0
+        int bytes_needed = get_key_bits() / 8;
+        assert(*sigret >= bytes_needed);
+
+        assert(m <= max_ptext_bytes());
+
+        success = RSA_verify(*m, m_len, *sigret, siglen);
+
+        assert(success != 0);
+//		int bytes_needed = get_key_bits() / 8;
+//		assert(*siglen >= bytes_needed);
+//
+//		*out_len = RSA_private_decrypt(m_len, in, out, rsa,
+//				RSA_PKCS1_PADDING);
+//		assert(*out_len != -1);
+#if 0
+	}
+#endif
+}
+
+int rsa_context::RSA_verify_message_batch(const unsigned char *m, unsigned int m_len,
+    			const unsigned char *sigbuf, unsigned int siglen,
+			int n)
+{
+	assert(0 < n && n <= max_batch);
+
+	for (int i = 0; i < n; i++)
+		RSA_verify(m[i], m_len[i], sigbuf[i], siglen[i]); //out[i], &out_len[i], in[i], in_len[i]);
 }
 
 float rsa_context::get_elapsed_ms_kernel()
