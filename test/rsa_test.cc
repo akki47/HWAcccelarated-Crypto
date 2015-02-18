@@ -353,14 +353,14 @@ static void sign_test_correctness(rsa_context *rsa, int iteration)
             set_random(ptext[i], ptext_len[i]);
 
 
-            rsa->RSA_sign(ptext[i], ptext_len[i], ctext[i], &ctext_len[i]);
+            rsa->RSA_sign_message(ptext[i], ptext_len[i], ctext[i], &ctext_len[i]);
 
             ptext_arr[i] = ptext[i];
             ctext_arr[i] = ctext[i];
         }
 
         signatureVerified = 0;
-        signatureVerified = rsa->RSA_verify_batch((unsigned char **)ptext_arr, ptext_len,
+        signatureVerified = rsa->RSA_verify_message_batch((unsigned char **)ptext_arr, ptext_len,
                                 (const unsigned char **)ctext_arr, ctext_len,
                                 k);
 
@@ -417,7 +417,7 @@ static void sign_test_latency(rsa_context *rsa)
 
             set_random(ptext[i], ptext_len[i]);
 
-            rsa->RSA_sign(ptext[i], ptext_len[i],
+            rsa->RSA_sign_message(ptext[i], ptext_len[i],
                             ctext[i], &ctext_len[i]);
 
             ptext_arr[i] = ptext[i];
@@ -429,7 +429,7 @@ again:
         int iteration = 1;
         begin = get_usec();
 try_more:
-        rsa->RSA_verify_batch((const unsigned char **)ptext_arr, ptext_len,
+        rsa->RSA_verify_message_batch((const unsigned char **)ptext_arr, ptext_len,
                                 (unsigned char **)ctext_arr, ctext_len ,
                                 k);
 
@@ -484,7 +484,7 @@ static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ct
                 dtext_len_str[s][i] = sizeof(dtext_str[s][i]);
                 set_random(ptext_str[s][i], ptext_len_str[s][i]);
 
-                rsa->RSA_sign(ptext_str[s][i], ptext_len_str[s][i],
+                rsa->RSA_sign_message(ptext_str[s][i], ptext_len_str[s][i],
                             ctext_str[s][i], &ctext_len_str[s][i]);
 
 
@@ -500,7 +500,7 @@ static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ct
         //warmup
         for (int i = 1; i < concurrency; i++)
         {
-            rsa->RSA_verify_stream((const unsigned char **)ptext_arr_str[i], ptext_len_str[i],
+            rsa->RSA_verify_message_stream((const unsigned char **)ptext_arr_str[i], ptext_len_str[i],
                                 (unsigned char **)ctext_arr_str[i], ctext_len_str[i],
                                 k, i);
 
@@ -536,7 +536,7 @@ static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ct
             }
             if (stream != 0)
             {
-                rsa->RSA_verify_stream((const unsigned char **)ptext_arr_str[stream], ptext_len_str[stream],
+                rsa->RSA_verify_message_stream((const unsigned char **)ptext_arr_str[stream], ptext_len_str[stream],
                                 (unsigned char **)ctext_arr_str[stream], ctext_len_str[stream],
                                 k, stream);
             }
@@ -611,6 +611,7 @@ void test_rsa_rns()
 
 void test_rsa_mp()
 {
+
 
     device_context dev_ctx;
     dev_ctx.init(10485760, 0);
@@ -731,6 +732,7 @@ void sign_test_rsa_rns()
 
 void sign_test_rsa_mp()
 {
+
 
 
     device_context dev_ctx;
