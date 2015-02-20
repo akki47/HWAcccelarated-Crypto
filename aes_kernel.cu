@@ -55,6 +55,7 @@ AES_cbc_128_encrypt_kernel_SharedMem(const uint8_t       *in_all,
 	/* Encrypt using cbc mode */
 	unsigned long len = pkt_offset[idx + 1] - pkt_offset[idx];
 	const unsigned char *iv = ivec;
+	*((uint64_t*)out) = *((uint64_t*)iv);
 
 	while (len >= AES_BLOCK_SIZE) {
 		*((uint64_t*)out)       = *((uint64_t*)in)       ^ *((uint64_t*)iv);
@@ -86,6 +87,7 @@ AES_cbc_128_encrypt_kernel_SharedMem(const uint8_t       *in_all,
 		*(checkbits + blockIdx.x) = 1;
 }
 
+__global__ void
 AES_cbc_128_hash_kernel_SharedMem(const uint8_t       *in_all,
 				     uint8_t             *out_all,
 				     const uint32_t      *pkt_offset,
@@ -136,6 +138,7 @@ AES_cbc_128_hash_kernel_SharedMem(const uint8_t       *in_all,
 	/* Encrypt using cbc mode */
 	unsigned long len = pkt_offset[idx + 1] - pkt_offset[idx];
 	const unsigned char *iv = ivec;
+	*((uint64_t*)out)       = *((uint64_t*)iv);
 
 	while (len >= AES_BLOCK_SIZE) {
 	
@@ -163,6 +166,7 @@ AES_cbc_128_hash_kernel_SharedMem(const uint8_t       *in_all,
 	if (threadIdx.x == 0 && checkbits != 0)
 		*(checkbits + blockIdx.x) = 1;
 }
+
 
 
 
@@ -354,7 +358,7 @@ void AES_cbc_128_encrypt_gpu(const uint8_t      *in_d,
 {
 	unsigned int num_cuda_blks = (num_flows+threads_per_blk - 1) / threads_per_blk;
 	if (stream == 0) {
-		AES_cbc_128_encrypt_kernel_SharedMem<<<num_cuda_blks, threads_per_blk>>>(
+		AES_cbc_128_hash_kernel_SharedMem<<<num_cuda_blks, threads_per_blk>>>(
 		    in_d, out_d, pkt_offset_d, keys_d, ivs_d, num_flows, checkbits_d);
 	} else {
 		AES_cbc_128_encrypt_kernel_SharedMem<<<num_cuda_blks, threads_per_blk, 0, stream>>>(
