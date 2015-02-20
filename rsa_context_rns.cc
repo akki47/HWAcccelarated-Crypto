@@ -172,11 +172,11 @@ void rsa_context_rns::priv_decrypt_batch(unsigned char **out, int *out_len,
 int rsa_context_rns::RSA_verify_message(unsigned char *m, unsigned int m_len,
     			unsigned char *sigbuf, unsigned int siglen)
 {
-	RSA_verify_message_batch(&m, m_len, &sigbuf, &siglen, 1);
+	RSA_verify_message_batch(&m, &m_len, &sigbuf, &siglen, 1);
 }
 
-int rsa_context_rns::RSA_verify_message_batch(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen,
+int rsa_context_rns::RSA_verify_message_batch(unsigned char **m, unsigned int *m_len,
+    			unsigned char **sigbuf, unsigned int *siglen,
 			int n)
 {
 	assert(0 < n && n <= max_batch);
@@ -224,7 +224,7 @@ int rsa_context_rns::RSA_verify_message_batch(unsigned char *m, unsigned int m_l
 				// fallback. necessary?
 				assert(false);
 				rsa_context::RSA_verify_message(m[i], m_len[i],
-                                    sigbuf[i], &siglen[i]);
+                                    sigbuf[i], siglen[i]);
 
 			} else {
 				BN_sub(t, out_bn[p], out_bn[q]);
@@ -232,8 +232,8 @@ int rsa_context_rns::RSA_verify_message_batch(unsigned char *m, unsigned int m_l
 				BN_mul(t, t, rsa->q, bn_ctx);
 				BN_add(t, out_bn[q], t);
 
-				int ret = remove_padding(sigbuf[i], &siglen[i], t);
-				assert(ret != -1);
+				//int ret = remove_padding(sigbuf[i], &siglen[i], t);
+				//assert(ret != -1);
 
 				BN_free(in_bn[p]);
 				BN_free(in_bn[q]);
@@ -269,10 +269,10 @@ int rsa_context_rns::RSA_verify_message_batch(unsigned char *m, unsigned int m_l
 				// fallback. necessary?
 				assert(false);
 				rsa_context::RSA_verify_message(m[i], m_len[i],
-                                    sigbuf[i], &siglen[i]);
+                                    sigbuf[i], siglen[i]);
 			} else {
-				int ret = remove_padding(sigbuf[i], &siglen[i], out_bn[i]);
-				assert(ret != -1);
+				//int ret = remove_padding(sigbuf[i], &siglen[i], out_bn[i]);
+				//assert(ret != -1);
 
 				BN_free(in_bn[i]);
 				BN_free(out_bn[i]);

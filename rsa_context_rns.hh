@@ -47,8 +47,8 @@ public:
 	 * @param siglen Length of the signature.
 	 * @param n Ciphertexts count.
 	 */
-	virtual int RSA_verify_message_batch(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen,
+	virtual int RSA_verify_message_batch(unsigned char **m, unsigned int *m_len,
+    			unsigned char **sigbuf, unsigned int *siglen,
 			int n);
 
 protected:

@@ -58,7 +58,7 @@ public:
 	 * @param in Buffer that stores cipher text.
 	 * @param in_len Length of cipher text
 	 */
-	virtual void priv_decrypt(unsigned char *out, int *out_len,
+	virtual void priv_decrypt(unsigned char *out, unsigned int *out_len,
 			const unsigned char *in, int in_len);
 
 	/**
@@ -71,7 +71,7 @@ public:
 	 * @param in_len Length of cipher texts.
 	 * @param n Ciphertexts count.
 	 */
-	virtual void priv_decrypt_batch(unsigned char **out, int *out_len,
+	virtual void priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
 			const unsigned char **in, const int *in_len,
 			int n);
 
@@ -87,7 +87,7 @@ public:
 	 * @param n Ciphertexts count.
 	 * @param stream_id Stream index. 1 <= stream_id <= max_stream
 	 */
-	void priv_decrypt_stream(unsigned char **out, int *out_len,
+	void priv_decrypt_stream(unsigned char **out, unsigned int *out_len,
 			const unsigned char **in, const int *in_len,
 			int n, unsigned int stream_id);
 
@@ -111,8 +111,8 @@ public:
 	 * @param siglen Length of the signature.
 	 * @param n Ciphertexts count.
 	 */
-	virtual int RSA_verify_message_batch(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen,
+	virtual int RSA_verify_message_batch(unsigned char **m, unsigned int *m_len,
+    			unsigned char **sigbuf, unsigned int *siglen,
 			int n);
 
     /**
@@ -127,8 +127,8 @@ public:
 	 * @param stream_id Stream index. 1 <= stream_id <= max_stream
 	 */
 
-	void RSA_verify_message_stream(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen,
+	int RSA_verify_message_stream(unsigned char **m, unsigned int *m_len,
+    			unsigned char **sigbuf, unsigned int *siglen,
 			int n, unsigned int stream_id);
 
 
@@ -171,7 +171,7 @@ private:
 		bool post_launched;
 
 		unsigned char **out;
-		int *out_len;
+		unsigned int *out_len;
 		int n;
 
 		WORD *a;

@@ -63,13 +63,13 @@ void rsa_context_mp::dump()
 	rsa_context::dump();
 }
 
-void rsa_context_mp::priv_decrypt(unsigned char *out, int *out_len,
+void rsa_context_mp::priv_decrypt(unsigned char *out, unsigned int *out_len,
 		const unsigned char *in, int in_len)
 {
 	priv_decrypt_batch(&out, out_len, &in, &in_len, 1);
 }
 
-void rsa_context_mp::priv_decrypt_batch(unsigned char **out, int *out_len,
+void rsa_context_mp::priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
 		const unsigned char **in, const int *in_len,
 		int n)
 {
@@ -78,7 +78,7 @@ void rsa_context_mp::priv_decrypt_batch(unsigned char **out, int *out_len,
 	sync(0);
 }
 
-void rsa_context_mp::priv_decrypt_stream(unsigned char **out, int *out_len,
+void rsa_context_mp::priv_decrypt_stream(unsigned char **out,unsigned int *out_len,
 		const unsigned char **in, const int *in_len,
 		int n, unsigned int stream_id)
 {
@@ -130,14 +130,14 @@ void rsa_context_mp::priv_decrypt_stream(unsigned char **out, int *out_len,
 }
 
 
-void rsa_context_mp::RSA_verify_message(unsigned char *m, unsigned int m_len,
+int rsa_context_mp::RSA_verify_message(unsigned char *m, unsigned int m_len,
     			unsigned char *sigbuf, unsigned int siglen)
 {
-    RSA_verify_message_batch(&m, m_len, &sigbuf, &siglen, 1);
+    RSA_verify_message_batch(&m, &m_len, &sigbuf, &siglen, 1);
 }
 
-void rsa_context_mp::RSA_verify_message_batch(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen,
+int rsa_context_mp::RSA_verify_message_batch(unsigned char **m, unsigned int *m_len,
+    			unsigned char **sigbuf, unsigned int *siglen,
 			int n)
 {
 	// by default, stream is not used
@@ -145,8 +145,8 @@ void rsa_context_mp::RSA_verify_message_batch(unsigned char *m, unsigned int m_l
 	sync(0);
 }
 
-void rsa_context_mp::RSA_verify_message_stream(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen,
+int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m_len,
+    			unsigned char **sigbuf, unsigned int *siglen,
 			int n, unsigned int stream_id)
 {
 	assert(is_crt_available());
@@ -192,8 +192,8 @@ void rsa_context_mp::RSA_verify_message_stream(unsigned char *m, unsigned int m_
 
 
 	streams[stream_id].n = n;
-	streams[stream_id].sigbuf = sigbuf;
-	streams[stream_id].siglen = siglen;
+	streams[stream_id].out = sigbuf;
+	streams[stream_id].out_len = siglen;
 }
 
 bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
