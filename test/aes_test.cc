@@ -8,6 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <iostream>
 
 #include "aes_kernel.h"
 #include "aes_context.hh"
@@ -249,6 +250,11 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 				    param.num_flows,
 				    param.tot_out_len,
 				    0);
+		cout<<endl<<"The hash for this round is:";
+		for (unsigned int g = 0; g < 16; g++) {
+			printf("%x", *(param.out+g));
+		}
+		cout<<endl;
 		aes_ctx.sync(0);
 		elaplsed_time[i] = dev_ctx.get_elapsed_time(0);
 	}
