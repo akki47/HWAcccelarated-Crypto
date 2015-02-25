@@ -30,10 +30,10 @@ $(OBJ_DIR):
 	mkdir $(OBJ_DIR)
 
 $(TARGET_DIR)% : $(OBJ_DIR)%.o |$(TARGET_DIR) $(OBJ_DIR) ../lib/libgpucrypto.a $(OBJ_DIR)common.o
-	g++ -o $@ $< $(CFLAGS) $(LIBS) $(LIBDIR) $(OBJ_DIR)common.o 
+	g++ -o $@ $< -g -O0 $(CFLAGS) $(LIBS) $(LIBDIR) $(OBJ_DIR)common.o 
 
 $(OBJ_DIR)%.o : %.cc
-	g++ $(CFLAGS) $(INC) $(NVINC) -c $< -o $@
+	g++ -g -O0 $(CFLAGS) $(INC) $(NVINC) -c $< -o $@
 
 .PHONY : clean
 clean:
