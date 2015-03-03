@@ -76,8 +76,8 @@ public:
 	 * @param in Intput plain text.
 	 * @param in_len Intpu plain text size.
 	 */
-	virtual void pub_encrypt(unsigned char *out, int *out_len,
-			const unsigned char *in, int in_len);
+	virtual void pub_encrypt(unsigned char *out, unsigned int *out_len,
+			const unsigned char *in, unsigned int in_len);
 
 	/**
 	 * Decrypt the data with RSA algorithm using private key.
@@ -88,8 +88,8 @@ public:
 	 * @param in Buffer that stores cipher text.
 	 * @param in_len Length of cipher text
 	 */
-	virtual void priv_decrypt(unsigned char *out, int *out_len,
-			const unsigned char *in, int in_len);
+	virtual void priv_decrypt(unsigned char *out, unsigned int *out_len,
+			const unsigned char *in, unsigned int in_len);
 
 	/**
 	 * Decrypt the data with RSA algorithm using private key in a batch
@@ -101,8 +101,8 @@ public:
 	 * @param in_len Length of cipher texts.
 	 * @param n Ciphertexts count.
 	 */
-	virtual void priv_decrypt_batch(unsigned char **out, int *out_len,
-			const unsigned char **in, const int *in_len,
+	virtual void priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
+			const unsigned char **in, const unsigned int *in_len,
 			int n);
 
 	/**
@@ -148,7 +148,7 @@ protected:
 	void dump_bn(BIGNUM *bn, const char *name);
 
 	// returns -1 if it fails
-	int remove_padding(unsigned char *out, int *out_len, BIGNUM *bn);
+	int remove_padding(unsigned char *out, unsigned int *out_len, BIGNUM *bn);
 
 	RSA *rsa;
 	BN_CTX *bn_ctx;

@@ -18,7 +18,7 @@ using namespace std;
 #include <openssl/bio.h>
 
 #include <cuda_runtime.h>
-#include <cutil_inline.h>
+#include <helper_cuda.h>
 
 #include "rsa_cuda.h"
 
@@ -354,11 +354,11 @@ RNS_CTX *RNS_CTX_new(BIGNUM *N, BIGNUM *d)
 void cpyRNSCTX2Dev()
 {
 	if (g_rns_ctx_d == NULL) {
-		cutilSafeCall(cudaMalloc(&g_rns_ctx_d, 
+		checkCudaErrors(cudaMalloc(&g_rns_ctx_d, 
 					MAX_RNS_CTXS * sizeof(RNS_CTX)));
 	}
 
-	cutilSafeCall(cudaMemcpy(g_rns_ctx_d, g_rns_ctx, 
+	checkCudaErrors(cudaMemcpy(g_rns_ctx_d, g_rns_ctx, 
 			MAX_RNS_CTXS * sizeof(RNS_CTX), 
 			cudaMemcpyHostToDevice));
 }
@@ -422,7 +422,7 @@ static struct dev_context *get_device()
 	int dev_id;
 	struct dev_context *dev;
 	
-	cutilSafeCall(cudaGetDevice(&dev_id));
+	checkCudaErrors(cudaGetDevice(&dev_id));
 	dev = &g_dev[dev_id];
 
 	if (!dev->initialized) {
@@ -430,13 +430,13 @@ static struct dev_context *get_device()
 
 		dev->initialized = true;
 
-		cutilSafeCall(cudaEventCreate(&dev->evt_begin));
-		cutilSafeCall(cudaEventCreate(&dev->evt_end));
+		checkCudaErrors(cudaEventCreate(&dev->evt_begin));
+		checkCudaErrors(cudaEventCreate(&dev->evt_end));
 
 		// XXX
 		size = sizeof(MODULI) * MAX_NUM_MSG * MAX_WIN * MAX_BS;
-		cutilSafeCall(cudaMalloc(&dev->M_A_d, size));
-		cutilSafeCall(cudaMalloc(&dev->M_B_d, size));
+		checkCudaErrors(cudaMalloc(&dev->M_A_d, size));
+		checkCudaErrors(cudaMalloc(&dev->M_B_d, size));
 
 		size = sizeof(MODULI) * MAX_NUM_MSG * MAX_BS;
 		dev->b_A = (MODULI *)alloc_pinned_mem(size);
@@ -444,14 +444,14 @@ static struct dev_context *get_device()
 		dev->r_A = (MODULI *)alloc_pinned_mem(size);
 		dev->r_B = (MODULI *)alloc_pinned_mem(size);
 		
-		cutilSafeCall(cudaMalloc(&dev->b_A_d, size));
-		cutilSafeCall(cudaMalloc(&dev->b_B_d, size));
-		cutilSafeCall(cudaMalloc(&dev->r_A_d, size));
-		cutilSafeCall(cudaMalloc(&dev->r_B_d, size));
+		checkCudaErrors(cudaMalloc(&dev->b_A_d, size));
+		checkCudaErrors(cudaMalloc(&dev->b_B_d, size));
+		checkCudaErrors(cudaMalloc(&dev->r_A_d, size));
+		checkCudaErrors(cudaMalloc(&dev->r_B_d, size));
 
 		size = MAX_NUM_MSG * sizeof(int);
 		dev->rns_ctx_idx = (int *)alloc_pinned_mem(size);
-		cutilSafeCall(cudaMalloc(&dev->rns_ctx_idx_d, size));
+		checkCudaErrors(cudaMalloc(&dev->rns_ctx_idx_d, size));
 	}
 
 	return dev;
@@ -534,37 +534,37 @@ float BN_mod_exp_mont_batch_cu(BIGNUM *r[], BIGNUM *b[], int n, RNS_CTX *rns_ctx
 		}
 	}
 
-	cutilSafeCall(cudaMemcpyAsync(dev->rns_ctx_idx_d, dev->rns_ctx_idx, 
+	checkCudaErrors(cudaMemcpyAsync(dev->rns_ctx_idx_d, dev->rns_ctx_idx, 
 			(m / MSGS_PER_BLOCK) * sizeof(int), 
 			cudaMemcpyHostToDevice, 0));
 
 	// copy base numbers
-	cutilSafeCall(cudaMemcpyAsync(dev->b_A_d, dev->b_A, memsize, 
+	checkCudaErrors(cudaMemcpyAsync(dev->b_A_d, dev->b_A, memsize, 
 				cudaMemcpyHostToDevice, 0));
-	cutilSafeCall(cudaMemcpyAsync(dev->b_B_d, dev->b_B, memsize, 
+	checkCudaErrors(cudaMemcpyAsync(dev->b_B_d, dev->b_B, memsize, 
 				cudaMemcpyHostToDevice, 0));
 
 	float elapsed_ms_kernel;
 	dim3 threads_per_block(bsize, MSGS_PER_BLOCK);
 	int num_blocks = m / MSGS_PER_BLOCK;
 
-	cutilSafeCall(cudaEventRecord(dev->evt_begin, 0));
+	checkCudaErrors(cudaEventRecord(dev->evt_begin, 0));
 	/* call kernel function, use one block per message */
 	BN_mod_exp_RNS_MONT_batch_kn<<<num_blocks, threads_per_block>>>(dev->r_A_d, dev->r_B_d, 
 			dev->b_A_d, dev->b_B_d, 
 			(MODULI (*)[MAX_WIN][MAX_BS])dev->M_A_d, 
 			(MODULI (*)[MAX_WIN][MAX_BS])dev->M_B_d,
 			g_rns_ctx_d, dev->rns_ctx_idx_d);
-	cutilSafeCall(cudaEventRecord(dev->evt_end, 0));
+	checkCudaErrors(cudaEventRecord(dev->evt_end, 0));
 
 	/* copy back result */
-	cutilSafeCall(cudaMemcpyAsync(dev->r_A, dev->r_A_d, memsize, 
+	checkCudaErrors(cudaMemcpyAsync(dev->r_A, dev->r_A_d, memsize, 
 				cudaMemcpyDeviceToHost, 0));
-	cutilSafeCall(cudaMemcpyAsync(dev->r_B, dev->r_B_d, memsize, 
+	checkCudaErrors(cudaMemcpyAsync(dev->r_B, dev->r_B_d, memsize, 
 				cudaMemcpyDeviceToHost, 0));
 
-	cutilSafeCall(cudaThreadSynchronize());
-	cutilSafeCall(cudaEventElapsedTime(&elapsed_ms_kernel, 
+	checkCudaErrors(cudaThreadSynchronize());
+	checkCudaErrors(cudaEventElapsedTime(&elapsed_ms_kernel, 
 			dev->evt_begin, dev->evt_end));
 
 	/* Convert results from rns to radix representation */

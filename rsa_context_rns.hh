@@ -21,10 +21,10 @@ public:
 
 	// All encryption/decryption methods assume RSA_PKCS1_PADDING
 	// out_len is an input+output variable
-	virtual void priv_decrypt(unsigned char *out, int *out_len,
-			const unsigned char *in, int in_len);
-	virtual void priv_decrypt_batch(unsigned char **out, int *out_len,
-			const unsigned char **in, const int *in_len,
+	virtual void priv_decrypt(unsigned char *out, unsigned int *out_len,
+			const unsigned char *in, unsigned int in_len);
+	virtual void priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
+			const unsigned char **in, const unsigned int *in_len,
 			int n);
 
 	/**

@@ -705,7 +705,7 @@ void aes_cbc_decrypt_prepare(operation_batch_t *ops,
 	     i != ops->end(); i++) {
 		assert((*i).in_len > 0);
 		assert((*i).in_len % AES_BLOCK_SIZE == 0);
-		assert((*i).op = AES_DEC);
+		assert((*i).op == AES_DEC);
 		tot_in_size += (*i).in_len;
 	}
 

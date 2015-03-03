@@ -6,7 +6,7 @@
 #include "device_context.hh"
 
 #include <cuda_runtime.h>
-#include <cutil_inline.h>
+#include <helper_cuda.h>
 
 /**
  * class rsa_context
@@ -59,7 +59,7 @@ public:
 	 * @param in_len Length of cipher text
 	 */
 	virtual void priv_decrypt(unsigned char *out, unsigned int *out_len,
-			const unsigned char *in, int in_len);
+			const unsigned char *in, unsigned int in_len);
 
 	/**
 	 * Decrypt the data with RSA algorithm using private key in a batch
@@ -72,7 +72,7 @@ public:
 	 * @param n Ciphertexts count.
 	 */
 	virtual void priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
-			const unsigned char **in, const int *in_len,
+			const unsigned char **in, const unsigned int *in_len,
 			int n);
 
 	/**
@@ -88,7 +88,7 @@ public:
 	 * @param stream_id Stream index. 1 <= stream_id <= max_stream
 	 */
 	void priv_decrypt_stream(unsigned char **out, unsigned int *out_len,
-			const unsigned char **in, const int *in_len,
+			const unsigned char **in, const unsigned int *in_len,
 			int n, unsigned int stream_id);
 
 	/**

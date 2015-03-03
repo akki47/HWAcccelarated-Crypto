@@ -82,20 +82,22 @@ void rsa_context::dump()
 	}
 }
 
-void rsa_context::pub_encrypt(unsigned char *out, int *out_len,
-		const unsigned char *in, int in_len)
+void rsa_context::pub_encrypt(unsigned char *out, unsigned int *out_len,
+		const unsigned char *in, unsigned int in_len)
 {
 	int bytes_needed = get_key_bits() / 8;
 	assert(*out_len >= bytes_needed);
 
 	assert(in_len <= max_ptext_bytes());
 
+
+
 	*out_len = RSA_public_encrypt(in_len, in, out, rsa, RSA_PKCS1_PADDING);
 	assert(*out_len != -1);
 }
 
-void rsa_context::priv_decrypt(unsigned char *out, int *out_len,
-		const unsigned char *in, int in_len)
+void rsa_context::priv_decrypt(unsigned char *out, unsigned int *out_len,
+		const unsigned char *in, unsigned int in_len)
 {
 #if 0
 	if (is_crt_available()) {
@@ -139,8 +141,8 @@ void rsa_context::priv_decrypt(unsigned char *out, int *out_len,
 #endif
 }
 
-void rsa_context::priv_decrypt_batch(unsigned char **out, int *out_len,
-		const unsigned char **in, const int *in_len,
+void rsa_context::priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
+		const unsigned char **in, const unsigned int *in_len,
 		int n)
 {
 	assert(0 < n && n <= max_batch);
@@ -149,16 +151,41 @@ void rsa_context::priv_decrypt_batch(unsigned char **out, int *out_len,
 		priv_decrypt(out[i], &out_len[i], in[i], in_len[i]);
 }
 
+void CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
+		unsigned char *digest, unsigned int digestlen)
+{
+		SHA_CTX sha_ctx = { 0 };
+		int rc = 1;
+
+	    rc = SHA1_Init(&sha_ctx);
+	    assert(rc ==1);
+	    //if (1 != rc) { handle_it(); status = EXIT_FAILURE; goto end; }
+
+	    rc = SHA1_Update(&sha_ctx, m, m_len);
+	    assert(rc ==1);
+	    //if (1 != rc) { handle_it(); status = EXIT_FAILURE; goto end; }
+
+	    rc = SHA1_Final(digest, &sha_ctx);
+	    assert(rc ==1);
+	    //if (1 != rc) { handle_it(); status = EXIT_FAILURE; goto end; }
+
+}
+
+
 int rsa_context::RSA_sign_message(const unsigned char *m, unsigned int m_len,
     			unsigned char *sigret, unsigned int siglen)
 {
-    	int success = 0;
+    int success = 0;
 	int bytes_needed = get_key_bits() / 8;
-	//assert(*sigret >= bytes_needed);
+
+	//unsigned int digest_len = SHA512_DIGEST_LENGTH;
+	unsigned char digest[SHA_DIGEST_LENGTH];
 
 	assert(m_len <= max_ptext_bytes());
 
-        success = RSA_sign(NID_sha1, m, m_len, sigret, &siglen, rsa);
+	CalculateMessageDigest(m, m_len, digest, SHA_DIGEST_LENGTH);
+
+    success = RSA_sign(NID_sha1, digest, sizeof(digest), sigret, &siglen, rsa);
 
 	//*out_len = RSA_public_encrypt(in_len, in, out, rsa, RSA_PKCS1_PADDING);
 	assert(success != 0);
@@ -200,12 +227,16 @@ int rsa_context::RSA_verify_message(const unsigned char *m, unsigned int m_len,
 #endif
         int success = 0;
         int bytes_needed = get_key_bits() / 8;
+        unsigned char digest[SHA_DIGEST_LENGTH];
         //assert(*sigret >= bytes_needed);
 
         assert(m_len <= max_ptext_bytes());
 
-        success = RSA_verify(NID_sha1, m, m_len, sigret, siglen, rsa);
+        CalculateMessageDigest(m, m_len, digest, SHA_DIGEST_LENGTH);
 
+        success = RSA_verify(NID_sha1, digest, sizeof(digest), sigret, siglen, rsa);
+
+        //printf("OpenSSL error: %s\n", ERR_error_string(ERR_get_error(), NULL));
         assert(success != 0);
 //		int bytes_needed = get_key_bits() / 8;
 //		assert(*siglen >= bytes_needed);
@@ -240,7 +271,7 @@ void rsa_context::dump_bn(BIGNUM *bn, const char *name)
 	printf("\n");
 }
 
-int rsa_context::remove_padding(unsigned char *out, int *out_len, BIGNUM *bn)
+int rsa_context::remove_padding(unsigned char *out, unsigned int *out_len, BIGNUM *bn)
 {
 	int bytes_needed = get_key_bits() / 8;
 	assert(*out_len >= bytes_needed);
@@ -277,7 +308,7 @@ void rsa_context::set_crt()
 
 // turn this on to disable CRT
 #if 1
-	crt_available = false;
+	crt_available = true;
 #endif
 
 	if (!crt_available) {

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <unistd.h>
 #include <sys/time.h>
 #include <openssl/bn.h>
 
@@ -34,20 +35,20 @@ rsa_context_mp::~rsa_context_mp()
 	BN_free(out_bn_p);
 	BN_free(out_bn_q);
 
-	cutilSafeCall(cudaFree(sw_d));
-	cutilSafeCall(cudaFree(n_d));
-	cutilSafeCall(cudaFree(np_d));
-	cutilSafeCall(cudaFree(r_sqr_d));
-	cutilSafeCall(cudaFree(iqmp_d));
+	checkCudaErrors(cudaFree(sw_d));
+	checkCudaErrors(cudaFree(n_d));
+	checkCudaErrors(cudaFree(np_d));
+	checkCudaErrors(cudaFree(r_sqr_d));
+	checkCudaErrors(cudaFree(iqmp_d));
 
 	for (unsigned int i = 0; i <= max_stream; i++) {
-		cutilSafeCall(cudaFree(streams[i].a_d));
-		cutilSafeCall(cudaFree(streams[i].ret_d));
-		cutilSafeCall(cudaFree(streams[i].dbg_d));
+		checkCudaErrors(cudaFree(streams[i].a_d));
+		checkCudaErrors(cudaFree(streams[i].ret_d));
+		checkCudaErrors(cudaFree(streams[i].dbg_d));
 
-		cutilSafeCall(cudaFreeHost(streams[i].a));
-		cutilSafeCall(cudaFreeHost(streams[i].ret));
-		cutilSafeCall(cudaFreeHost(streams[i].dbg));
+		checkCudaErrors(cudaFreeHost(streams[i].a));
+		checkCudaErrors(cudaFreeHost(streams[i].ret));
+		checkCudaErrors(cudaFreeHost(streams[i].dbg));
 	}
 }
 
@@ -64,13 +65,13 @@ void rsa_context_mp::dump()
 }
 
 void rsa_context_mp::priv_decrypt(unsigned char *out, unsigned int *out_len,
-		const unsigned char *in, int in_len)
+		const unsigned char *in, unsigned int in_len)
 {
 	priv_decrypt_batch(&out, out_len, &in, &in_len, 1);
 }
 
 void rsa_context_mp::priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
-		const unsigned char **in, const int *in_len,
+		const unsigned char **in, const unsigned int *in_len,
 		int n)
 {
 	// by default, stream is not used
@@ -79,7 +80,7 @@ void rsa_context_mp::priv_decrypt_batch(unsigned char **out, unsigned int *out_l
 }
 
 void rsa_context_mp::priv_decrypt_stream(unsigned char **out,unsigned int *out_len,
-		const unsigned char **in, const int *in_len,
+		const unsigned char **in, const unsigned int *in_len,
 		int n, unsigned int stream_id)
 {
 	assert(is_crt_available());
@@ -233,11 +234,12 @@ bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 		    streams[stream_id].post_launched == true) {
 			//copy result
 			dev_ctx_->set_state(stream_id, WAIT_COPY);
-			cutilSafeCall(cudaMemcpyAsync(streams[stream_id].ret,
+
+			checkCudaErrors(cudaMemcpy(streams[stream_id].ret,
 						      streams[stream_id].ret_d,
 						      sizeof(WORD[2][MAX_S]) * streams[stream_id].n,
-						      cudaMemcpyDeviceToHost,
-						      dev_ctx_->get_stream(stream_id)));
+						      cudaMemcpyDeviceToHost));//,
+						      //dev_ctx_->get_stream(stream_id)));
 			dev_ctx_->sync(stream_id, true);
 		}
 
@@ -254,12 +256,12 @@ bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 								 (unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + 1,
 								 rsa_bytes - 1,
 								 rsa_bytes);
-			if (ret == -1) {
-				for (int j = 0; j < 2 * word_len * (int)sizeof(WORD); j++)
-					printf("%02x ", *(((unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + j)));
-				printf("\n");
-				assert(false);
-			}
+			//if (ret == -1) {
+			//	for (int j = 0; j < 2 * word_len * (int)sizeof(WORD); j++)
+			//		printf("%02x ", *(((unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + j)));
+			//	printf("\n");
+			//	//assert(false);
+			//}
 			streams[stream_id].out_len[i] = ret;
 		}
 
@@ -294,11 +296,11 @@ bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 		} else {
 			//start copying result
 			dev_ctx_->set_state(stream_id, WAIT_COPY);
-			cutilSafeCall(cudaMemcpyAsync(streams[stream_id].ret,
+			checkCudaErrors(cudaMemcpy(streams[stream_id].ret,
 						      streams[stream_id].ret_d,
 						      sizeof(WORD[2][MAX_S]) * streams[stream_id].n,
-						      cudaMemcpyDeviceToHost,
-						      dev_ctx_->get_stream(stream_id)));
+						      cudaMemcpyDeviceToHost));//,
+						      //dev_ctx_->get_stream(stream_id)));
 			return false;
 		}
 
@@ -355,23 +357,23 @@ void rsa_context_mp::gpu_setup()
 		mp_get_sw(&sw[0], mp_e[0], word_len);
 		mp_get_sw(&sw[1], mp_e[1], word_len);
 
-		cutilSafeCall(cudaMalloc(&sw_d, sizeof(struct mp_sw) * 2));
-		cutilSafeCall(cudaMemcpy(sw_d, sw, sizeof(struct mp_sw) * 2, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMalloc(&sw_d, sizeof(struct mp_sw) * 2));
+		checkCudaErrors(cudaMemcpy(sw_d, sw, sizeof(struct mp_sw) * 2, cudaMemcpyHostToDevice));
 	}
 
 	{
 		mp_bn2mp(mp_n[0], rsa->p, word_len);
 		mp_bn2mp(mp_n[1], rsa->q, word_len);
 
-		cutilSafeCall(cudaMalloc(&n_d, sizeof(mp_n[0]) * 2));
-		cutilSafeCall(cudaMemcpy(n_d, mp_n, sizeof(mp_n[0]) * 2, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMalloc(&n_d, sizeof(mp_n[0]) * 2));
+		checkCudaErrors(cudaMemcpy(n_d, mp_n, sizeof(mp_n[0]) * 2, cudaMemcpyHostToDevice));
 	}
 
 	{
 		mp_bn2mp(mp_iqmp, rsa->iqmp, word_len);
 
-		cutilSafeCall(cudaMalloc(&iqmp_d, sizeof(mp_iqmp)));
-		cutilSafeCall(cudaMemcpy(iqmp_d, mp_iqmp, sizeof(mp_iqmp), cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMalloc(&iqmp_d, sizeof(mp_iqmp)));
+		checkCudaErrors(cudaMemcpy(iqmp_d, mp_iqmp, sizeof(mp_iqmp), cudaMemcpyHostToDevice));
 	}
 
 	r = BN_new();
@@ -406,30 +408,30 @@ void rsa_context_mp::gpu_setup()
 		BN_mod_mul(R_SQR, r, r, rsa->q, bn_ctx);
 		mp_bn2mp(mp_r_sqr[1], R_SQR, word_len);
 
-		cutilSafeCall(cudaMalloc(&r_sqr_d, sizeof(mp_r_sqr[0]) * 2));
-		cutilSafeCall(cudaMemcpy(r_sqr_d, mp_r_sqr, sizeof(mp_r_sqr[0]) * 2, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMalloc(&r_sqr_d, sizeof(mp_r_sqr[0]) * 2));
+		checkCudaErrors(cudaMemcpy(r_sqr_d, mp_r_sqr, sizeof(mp_r_sqr[0]) * 2, cudaMemcpyHostToDevice));
 
 		BN_free(R_SQR);
 	}
 
-	cutilSafeCall(cudaMalloc(&np_d, sizeof(mp_np[0]) * 2));
-	cutilSafeCall(cudaMemcpy(np_d, mp_np, sizeof(mp_np[0]) * 2, cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMalloc(&np_d, sizeof(mp_np[0]) * 2));
+	checkCudaErrors(cudaMemcpy(np_d, mp_np, sizeof(mp_np[0]) * 2, cudaMemcpyHostToDevice));
 
-	cutilSafeCall(cudaEventCreate(&begin_evt));
-	cutilSafeCall(cudaEventCreate(&end_evt));
+	checkCudaErrors(cudaEventCreate(&begin_evt));
+	checkCudaErrors(cudaEventCreate(&end_evt));
 
 	for (unsigned int i = 0; i <= max_stream; i++) {
-		cutilSafeCall(cudaMalloc(&streams[i].dbg_d, sizeof(WORD[max_batch][2][MAX_S])));
-		cutilSafeCall(cudaMalloc(&streams[i].ret_d, sizeof(WORD[max_batch][2][MAX_S])));
-		cutilSafeCall(cudaMalloc(&streams[i].a_d, sizeof(WORD[max_batch][2][MAX_S])));
+		checkCudaErrors(cudaMalloc(&streams[i].dbg_d, sizeof(WORD[max_batch][2][MAX_S])));
+		checkCudaErrors(cudaMalloc(&streams[i].ret_d, sizeof(WORD[max_batch][2][MAX_S])));
+		checkCudaErrors(cudaMalloc(&streams[i].a_d, sizeof(WORD[max_batch][2][MAX_S])));
 
-		cutilSafeCall(cudaHostAlloc(&streams[i].a,
+		checkCudaErrors(cudaHostAlloc(&streams[i].a,
 					sizeof(WORD[max_batch][2][MAX_S]),
 					cudaHostAllocPortable));
-		cutilSafeCall(cudaHostAlloc(&streams[i].ret,
+		checkCudaErrors(cudaHostAlloc(&streams[i].ret,
 					sizeof(WORD[max_batch][2][MAX_S]),
 					cudaHostAllocPortable));
-		cutilSafeCall(cudaHostAlloc(&streams[i].dbg,
+		checkCudaErrors(cudaHostAlloc(&streams[i].dbg,
 					sizeof(WORD[max_batch][2][MAX_S]),
 					cudaHostAllocPortable));
 	}

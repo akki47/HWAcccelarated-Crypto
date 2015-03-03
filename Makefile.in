@@ -1,28 +1,28 @@
 #modify directory configuration below to match your configuration \
  if you want use system default openssl-dev installation then comment out the OPENSSL_DIR line
 OPENSSL_DIR = /usr/local/ssl
-CUDA_TOOLKIT_DIR = /usr/local/cuda
-CUDA_SDK_DIR = /home/citadmin/NVIDIA_GPU_Computing_SDK
+CUDA_TOOLKIT_DIR = /usr/local/cuda-6.5
+CUDA_SDK_DIR = /usr/local/cuda-6.5
 
 #openssl config
 ifneq ($(OPENSSL_DIR), )
-	OPENSSL_LIBDIR = -L$(OPENSSL_DIR)/lib64
-	OPENSSL_INCDIR = -I$(OPENSSL_DIR)/include
+	OPENSSL_LIBDIR = -L/usr/lib/x86_64-linux-gnu
+	OPENSSL_INCDIR = -I/usr/include/openssl
 endif
 OPENSSL_LIB = -lcrypto
 
 #generic config
 CC = gcc
-CFLAGS = -O2 -g -Wall
+CFLAGS = -O0 -g -Wall
 INC = $(OPENSSL_INCDIR)
 
 #CUDA related config 
 NVCC=nvcc
 NVCFLAGS= --ptxas-options=-v -O2 --use_fast_math
-NVINC = -I/usr/local/cuda-6.5/include -I$(CUDA_SDK_DIR)/C/common/inc
+NVINC = -I/usr/local/cuda-6.5/include -I$(CUDA_SDK_DIR)/samples/common/inc
 
-CUDA_LIBDIR = -L$(CUDA_TOOLKIT_DIR)/lib64  -L$(CUDA_SDK_DIR)/C/lib
-CUDA_LIBS = -lcudart
+CUDA_LIBDIR = -L$(CUDA_TOOLKIT_DIR)/lib64 -L/usr/lib/i386-linux-gnu -L/usr/local/cuda-6.5/lib64/stubs -L/usr/lib/x86_64-linux-gnu
+CUDA_LIBS =  -lcuda -lcudart
 
 #below lines automatically detects the fermi devices using lspci command
 #if any CUDA device that supports architecture 2.x is detected,

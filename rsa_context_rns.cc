@@ -57,14 +57,14 @@ void rsa_context_rns::dump()
 	rsa_context::dump();
 }
 
-void rsa_context_rns::priv_decrypt(unsigned char *out, int *out_len,
-		const unsigned char *in, int in_len)
+void rsa_context_rns::priv_decrypt(unsigned char *out, unsigned int *out_len,
+		const unsigned char *in, unsigned int in_len)
 {
 	priv_decrypt_batch(&out, out_len, &in, &in_len, 1);
 }
 
-void rsa_context_rns::priv_decrypt_batch(unsigned char **out, int *out_len,
-		const unsigned char **in, const int *in_len,
+void rsa_context_rns::priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
+		const unsigned char **in, const unsigned int *in_len,
 		int n)
 {
 	assert(0 < n && n <= max_batch);

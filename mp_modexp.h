@@ -6,7 +6,7 @@
 #include <openssl/bn.h>
 
 #include <cuda_runtime.h>
-#include <cutil_inline.h>
+#include <helper_cuda.h>
 
 #define MAX_STREAMS		16
 #define MP_MAX_NUM_PAIRS	1024
@@ -59,8 +59,8 @@ typedef uint32_t WORD;
 #endif
 
 /* c: carry (may increment by 1)
-   s: partial sum
-   x, y: operands */
+ s: partial sum
+ x, y: operands */
 #define ADD_CARRY(c, s, x, y) \
 		do { \
 			WORD _t = (x) + (y); \
@@ -82,8 +82,8 @@ typedef uint32_t WORD;
 		} while (0)
 
 /* b: borrow (may increment by 1)
-   d: partial difference
-   x, y: operands (a - b) */
+ d: partial difference
+ x, y: operands (a - b) */
 #define SUB_BORROW(b, d, x, y) \
 		do { \
 			WORD _t = (x) - (y); \
@@ -128,27 +128,17 @@ void mp_mp2bn(BIGNUM *bn, const WORD *a, int word_len = MAX_S);
 void mp_copy(WORD *dst, const WORD *org, int word_len = MAX_S);
 void mp_get_sw(struct mp_sw *ret, const WORD *a, int word_len = MAX_S);
 
-void mp_modexp_crt(WORD *a,
-		int cnt, int S,
-		WORD *ret_d, WORD *ar_d,
-		struct mp_sw *sw_d,
-		WORD *n_d, WORD *np_d, WORD *r_sqr_d,
-		cudaStream_t stream,
-		unsigned int stream_id,
-		uint8_t *checkbits = 0);
+void mp_modexp_crt(WORD *a, int cnt, int S, WORD *ret_d, WORD *ar_d,
+		struct mp_sw *sw_d, WORD *n_d, WORD *np_d, WORD *r_sqr_d,
+		cudaStream_t stream, unsigned int stream_id, uint8_t *checkbits = 0);
 
-int mp_modexp_crt_sync(WORD *ret, WORD *ret_d,
-		WORD *n_d, WORD *np_d, WORD *r_sqr_d, WORD *iqmp_d,
-		int cnt, int S,
-		bool block, cudaStream_t stream,
-		uint8_t *checkbits = 0);
+int mp_modexp_crt_sync(WORD *ret, WORD *ret_d, WORD *n_d, WORD *np_d,
+		WORD *r_sqr_d, WORD *iqmp_d, int cnt, int S, bool block,
+		cudaStream_t stream, uint8_t *checkbits = 0);
 
-int mp_modexp_crt_post_kernel(WORD *ret, WORD *ret_d, WORD *n_d, WORD *np_d, WORD *r_sqr_d, WORD *iqmp_d,
-			      int cnt, int S,
-			      bool block, cudaStream_t stream,
-			      uint8_t *checkbits = 0);
-
-
+int mp_modexp_crt_post_kernel(WORD *ret, WORD *ret_d, WORD *n_d, WORD *np_d,
+		WORD *r_sqr_d, WORD *iqmp_d, int cnt, int S, bool block,
+		cudaStream_t stream, uint8_t *checkbits = 0);
 
 void mp_test_cpu();
 void mp_test_gpu();
@@ -158,18 +148,18 @@ void mp_mul_cpu(WORD *ret, const WORD *a, const WORD *b);
 int mp_add_cpu(WORD *ret, const WORD *x, const WORD *y);
 int mp_add1_cpu(WORD *ret, const WORD *x);
 int mp_sub_cpu(WORD *ret, const WORD *x, const WORD *y);
-void mp_montmul_cpu(WORD *ret, const WORD *a, const WORD *b,
-		const WORD *n, const WORD *np);
-void mp_modexp_cpu(WORD *ret, const WORD *ar, const WORD *e,
-		const WORD *n, const WORD *np);
+void mp_montmul_cpu(WORD *ret, const WORD *a, const WORD *b, const WORD *n,
+		const WORD *np);
+void mp_modexp_cpu(WORD *ret, const WORD *ar, const WORD *e, const WORD *n,
+		const WORD *np);
 
 void mp_mul_gpu(WORD *ret, const WORD *x, const WORD *y);
 void mp_add_gpu(WORD *ret, const WORD *x, const WORD *y);
 void mp_add1_gpu(WORD *ret, const WORD *x);
 void mp_sub_gpu(WORD *ret, const WORD *x, const WORD *y);
-void mp_montmul_gpu(WORD *ret, const WORD *a, const WORD *b,
-		const WORD *n, const WORD *np);
-void mp_modexp_gpu(WORD *ret, const WORD *ar, const WORD *e,
-		const WORD *n, const WORD *np);
+void mp_montmul_gpu(WORD *ret, const WORD *a, const WORD *b, const WORD *n,
+		const WORD *np);
+void mp_modexp_gpu(WORD *ret, const WORD *ar, const WORD *e, const WORD *n,
+		const WORD *np);
 
 #endif
