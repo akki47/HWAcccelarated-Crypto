@@ -123,7 +123,7 @@ static void test_correctness(rsa_context *rsa, int iteration)
         fflush(stdout);
     }
 
-    //assert(all_correct);
+    assert(all_correct);
     printf("OK\n");
 }
 
@@ -557,6 +557,13 @@ static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ct
 void test_rsa_cpu()
 {
     printf("------------------------------------------\n");
+    printf("RSA512, CPU, random\n");
+    printf("------------------------------------------\n");
+    rsa_context rsa512_cpu(512);
+    test_latency(&rsa512_cpu);
+    test_correctness(&rsa512_cpu, 20);
+
+    printf("------------------------------------------\n");
     printf("RSA1024, CPU, random\n");
     printf("------------------------------------------\n");
     rsa_context rsa1024_cpu(1024);
@@ -604,8 +611,6 @@ void test_rsa_rns()
 
 void test_rsa_mp()
 {
-
-
     device_context dev_ctx;
     dev_ctx.init(10485760, 0);
 
@@ -725,9 +730,6 @@ void sign_test_rsa_rns()
 
 void sign_test_rsa_mp()
 {
-
-
-
     device_context dev_ctx;
     dev_ctx.init(10485760, 0);
 

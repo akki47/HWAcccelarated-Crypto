@@ -288,6 +288,8 @@ __global__ void mp_modexp_post_kernel(int num_pairs,
 
 	n[idx] = N[0 * MAX_S + idx];
 
+	__syncthreads();
+
 	if (c[S - 1] == 1) {
 		c[S - 1] = 0;
 

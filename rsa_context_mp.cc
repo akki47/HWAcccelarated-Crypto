@@ -256,12 +256,12 @@ bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 								 (unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + 1,
 								 rsa_bytes - 1,
 								 rsa_bytes);
-			//if (ret == -1) {
-			//	for (int j = 0; j < 2 * word_len * (int)sizeof(WORD); j++)
-			//		printf("%02x ", *(((unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + j)));
-			//	printf("\n");
-			//	//assert(false);
-			//}
+			if (ret == -1) {
+				for (int j = 0; j < 2 * word_len * (int)sizeof(WORD); j++)
+					printf("%02x ", *(((unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + j)));
+				printf("\n");
+				assert(false);
+			}
 			streams[stream_id].out_len[i] = ret;
 		}
 

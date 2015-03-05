@@ -106,24 +106,19 @@ void rsa_context::priv_decrypt(unsigned char *out, unsigned int *out_len,
 		BIGNUM *c = BN_bin2bn(in, in_len, NULL);
 		assert(c != NULL);
 		assert(BN_cmp(c, rsa->n) == -1);
-
 		BIGNUM *m1 = BN_new();
 		BIGNUM *m2 = BN_new();
 		BIGNUM *t = BN_new();
-
 		BN_nnmod(t, c, rsa->p, bn_ctx);
 		BN_mod_exp(m1, t, rsa->dmp1, rsa->p, bn_ctx);
 		BN_nnmod(t, c, rsa->q, bn_ctx);
 		BN_mod_exp(m2, t, rsa->dmq1, rsa->q, bn_ctx);
-
 		BN_sub(t, m1, m2);
 		BN_mod_mul(t, t, rsa->iqmp, rsa->p, bn_ctx);
 		BN_mul(t, t, rsa->q, bn_ctx);
 		BN_add(t, m2, t);
-
 		int ret = remove_padding(out, out_len, t);
 		assert(ret != -1);
-
 		BN_free(c);
 		BN_free(m1);
 		BN_free(m2);
@@ -201,24 +196,19 @@ int rsa_context::RSA_verify_message(const unsigned char *m, unsigned int m_len,
 		BIGNUM *c = BN_bin2bn(m, m_len, NULL);
 		assert(c != NULL);
 		assert(BN_cmp(c, rsa->n) == -1);
-
 		BIGNUM *m1 = BN_new();
 		BIGNUM *m2 = BN_new();
 		BIGNUM *t = BN_new();
-
 		BN_nnmod(t, c, rsa->p, bn_ctx);
 		BN_mod_exp(m1, t, rsa->dmp1, rsa->p, bn_ctx);
 		BN_nnmod(t, c, rsa->q, bn_ctx);
 		BN_mod_exp(m2, t, rsa->dmq1, rsa->q, bn_ctx);
-
 		BN_sub(t, m1, m2);
 		BN_mod_mul(t, t, rsa->iqmp, rsa->p, bn_ctx);
 		BN_mul(t, t, rsa->q, bn_ctx);
 		BN_add(t, m2, t);
-
 		int ret = remove_padding(sigbuf, sig_len, t);
 		assert(ret != -1);
-
 		BN_free(c);
 		BN_free(m1);
 		BN_free(m2);
