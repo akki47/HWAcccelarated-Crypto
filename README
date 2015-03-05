@@ -1,41 +1,16 @@
 GENERAL
 =======
+
+This library contains implementations of cryptographic algorithms
+such as AES-HASH(Davis-Meyer hash), RSA-SIGN, Condensed-RSA, both in 
+CPU and GPU. These can be used for further research and modifications
+for fast authentication in System-on-chips.
+
+THe basic framework and AES,RSA code is forked from the libgpucrypto library.
 libgpucrypto is subset of SSLShader software that implements
 few cryptographic algorithms: AES, SHA1, RSA using CUDA.
 This code is distributed under BSD-style license.
 Read LICENSE for more details.
-
-It requires CUDA 1.2 or above capable devices.
-We have tested our code on GTX285, GTX480, and GTX580.
-
-Below is the machine specification we used for the test.
-
-CPU: Intel X5650 2.66Ghz x 2
-M/B: Super Micro X8DAH
-RAM: DDR3 4GB x 6
-
-libgpucrypto is developed under Linux environment,
-and it is dependent on CUDA and OpenSSL.
-We have tesed our code on CUDA 3.2 and 4.0
-along with OpenSSL 1.0.0 (Mar 29, 2010).
-Below, we list versions of software that we have tested.
-
-* CUDA 4.0
-CUDA driver  : 270.41.19
-CUDA toolkit : 4.0.17
-CUDA SDK     : 4.0.17
-
-* CUDA 3.2
-CUDA driver  : 260.19.26
-CUDA toolkit : 3.2.16
-CUDA SDK     : 3.2.16
-
-* O/S
-Ubuntu 10.04 LTS 64bit
-
-We never tested our code on other Linux distributions nor 32 bit systems.
-Please do not ask for help on distribution specific issues.
-
 
 SETUP
 =====
@@ -107,11 +82,17 @@ however input data should be aligned before passed into GPU.
 The current test code that we provide do not deal with it,
 and will not work correctly if you try non-multiple of 16 bytes.
 
+* Known issues 
+1) Target the proper architecture of the graphic card in Makefile.
+   # CUDA code generation flags
+GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
+GENCODE_SM20    := -gencode arch=compute_20,code=sm_20
+GENCODE_SM30    := -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
+GENCODE_FLAGS   :=  $(GENCODE_SM30) ?????????????
 
 CONTACTS
 ========
-More information about the project is available at 
-http://shader.kaist.edu/sslshader
-
-If you have trouble using the library
-please contact us at tengig@an.kaist.ac.kr.
+For more information about the project throw a mail to:
+ ipapapan@purdue.edu
+ asingla@purdue.edu
+ amudgerikar@purdue.edu
