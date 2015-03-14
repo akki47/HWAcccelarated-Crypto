@@ -309,8 +309,8 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 				    param.num_flows,
 				    param.tot_out_len,
 				    0);
-		cout<<endl<<"The hash for round "<<i<<" is:"<<endl;
-		for ( int g = 0; g < num_flows; g++) {
+		//cout<<endl<<"The hash for round "<<i<<" is:"<<endl;
+		/*for ( int g = 0; g < num_flows; g++) {
 			printf("The hash for message %d is: ",g);
 			for(int f=0;f<16;f++)
 			{
@@ -318,7 +318,7 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 			}
 			cout<<endl;
 		}
-		cout<<endl;
+		cout<<endl;*/
 		aes_ctx.sync(0);
 		elaplsed_time[i] = dev_ctx.get_elapsed_time(0);
 	}
@@ -329,7 +329,7 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 	avg = total / rounds;
 
 	printf("%4d %13ld %13ld\n",
-	       num_flows, avg, num_flows * flow_len * 8 / avg);
+	       num_flows, avg/1000, num_flows * flow_len * 8 / avg);
 
 	delete pool;
 }

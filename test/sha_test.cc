@@ -268,7 +268,7 @@ static void test_latency_hmac_sha1(unsigned num_flows, unsigned flow_len)
 	delete pool;
 
 	printf("%4d %13ld %13ld\n",
-	       num_flows, avg, num_flows * flow_len * 8 / avg);
+	       num_flows, avg/1000, num_flows * flow_len * 8 / avg);
 }
 
 static void test_latency_stream_hmac_sha1(unsigned num_flows,
@@ -344,16 +344,16 @@ static void test_latency_stream_hmac_sha1(unsigned num_flows,
 	delete pool;
 	printf("%4d %7d %13ld %13ld\n",
 	       num_flows, num_stream,
-	       avg,
+	       avg/1000,
 	       num_flows * flow_len * 8 / avg);
 }
 
 void test_hmac_sha1(int size)
 {
 	printf("------------------------------------------\n");
-	printf("HMAC_SHA1, Size: %dKB\n", size / 1024);
+	printf("HMAC_SHA1 GPU, Size: %dKB\n", size / 1024);
 	printf("------------------------------------------\n");
-	printf("#msg latency(usec) thruput(Mbps)\n");
+	printf("#msg latency(ms) thruput(Mbps)\n");
 	for (unsigned i = 1 ; i <= 4096 ;i = i * 2)
 		test_latency_hmac_sha1(i, size);
 
@@ -374,7 +374,7 @@ void test_hmac_sha1_stream(int size, int num_stream)
 	printf("------------------------------------------\n");
 	printf("HMAC_SHA1, Size: %dKB\n", size / 1024);
 	printf("------------------------------------------\n");
-	printf("#msg #stream latency(usec) thruput(Mbps)\n");
+	printf("#msg #stream latency(ms) thruput(Mbps)\n");
 	for (unsigned i = 1 ; i <= 4096 ;i = i * 2)
 		test_latency_stream_hmac_sha1(i, size, num_stream);
 }
