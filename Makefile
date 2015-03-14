@@ -116,10 +116,10 @@ $(DEPS): $(SRC_FILES) $(HEADER_FILES)
 	$(CC) -MM -MP -x c++ $(CU_SRC_FILES) $(CC_SRC_FILES) | sed 's![^:]*.o:!objs/&!g' > Makefile.dep
 
 $(OBJS_DIR)/%.o : %.cc
-	$(GCC) -g $(CCFLAGS) $(NVCCINCLUDES) -c $< -o $@
+	$(GCC) $(CCFLAGS) $(NVCCINCLUDES) -c $< -o $@
 
 $(OBJS_DIR)/%.o : %.cu
-	$(NVCC) -g -G $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
+	$(NVCC) -G $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
 
 .PHONY : clean
 
