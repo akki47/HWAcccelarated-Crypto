@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <openssl/bn.h>
+#include <openssl/sha.h>
 
 #include "rsa_context_mp.hh"
 
@@ -131,23 +132,45 @@ void rsa_context_mp::priv_decrypt_stream(unsigned char **out,unsigned int *out_l
 }
 
 
-int rsa_context_mp::RSA_verify_message(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen)
+int rsa_context_mp::RSA_verify_message(const unsigned char *m, unsigned int m_len,
+    			const unsigned char *sigbuf, unsigned int siglen)
 {
     RSA_verify_message_batch(&m, &m_len, &sigbuf, &siglen, 1);
 }
 
-int rsa_context_mp::RSA_verify_message_batch(unsigned char **m, unsigned int *m_len,
-    			unsigned char **sigbuf, unsigned int *siglen,
+int rsa_context_mp::RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
+    			const unsigned char **sigbuf, unsigned int *siglen,
 			int n)
 {
+	unsigned char ptext[rsa_context::max_batch][512];
+	unsigned int ptext_len[rsa_context::max_batch];
+
 	// by default, stream is not used
-	RSA_verify_message_stream(m, m_len, sigbuf, siglen, n, 0);
+	RSA_verify_message_stream((unsigned char**)ptext, (unsigned int*)ptext_len, sigbuf, siglen, n, 0);
 	sync(0);
+
+	int success = 0;
+	int bytes_allowed = get_key_bits() / 8;
+	int digestLength = SHA_DIGEST_LENGTH;
+	unsigned char digest[digestLength];
+
+	//Check that the length of the digest is less than the max bytes allowed.
+	assert(digestLength <= bytes_allowed);
+
+	for(int i = 0;i < n; i++)
+	{
+		//Calculate message digest.
+		CalculateMessageDigest(m[i], m_len[i], digest, digestLength);
+
+		if(memcmp(digest, ptext[i], SHA_DIGEST_LENGTH) != 0)
+			return 0;
+	}
+
+	return 1;
 }
 
 int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m_len,
-    			unsigned char **sigbuf, unsigned int *siglen,
+    			const unsigned char **sigbuf, unsigned int *siglen,
 			int n, unsigned int stream_id)
 {
 	assert(is_crt_available());
@@ -165,8 +188,8 @@ int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m
 	streams[stream_id].post_launched = false;
 
 	for (int i = 0; i < n; i++) {
-		BN_bin2bn(m[i], m_len[i], in_bn_p);
-		BN_bin2bn(m[i], m_len[i], in_bn_q);
+		BN_bin2bn(sigbuf[i], siglen[i], in_bn_p);
+		BN_bin2bn(sigbuf[i], siglen[i], in_bn_q);
 		assert(in_bn_p != NULL);
 		assert(in_bn_q != NULL);
 
@@ -193,8 +216,8 @@ int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m
 
 
 	streams[stream_id].n = n;
-	streams[stream_id].out = sigbuf;
-	streams[stream_id].out_len = siglen;
+	streams[stream_id].out = m;
+	streams[stream_id].out_len = m_len;
 }
 
 bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)

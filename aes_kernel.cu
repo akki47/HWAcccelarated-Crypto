@@ -139,14 +139,15 @@ AES_cbc_128_hash_kernel_SharedMem(const uint8_t       *in_all,
 	unsigned long len = pkt_offset[idx + 1] - pkt_offset[idx];
 	const unsigned char *iv = ivec;
 	*((uint64_t*)out)       = *((uint64_t*)iv);
+	int i=0;
 
 	while (len >= AES_BLOCK_SIZE) {
-	
 		iv = out;
-		AES_128_encrypt(out, out, key,
+		AES_128_encrypt(out, out, in+(16*i),
 				shared_Te0, shared_Te1, shared_Te2, shared_Te3, shared_Rcon);
 		*((uint64_t*)out)       = *((uint64_t*)out)       ^ *((uint64_t*)iv);
 		len -= AES_BLOCK_SIZE;
+		i++;
 	}
 
 
@@ -159,6 +160,7 @@ AES_cbc_128_hash_kernel_SharedMem(const uint8_t       *in_all,
 				shared_Te0, shared_Te1, shared_Te2, shared_Te3, shared_Rcon);
 		iv = out;
 	}
+
 
 	*((uint4*)ivec) = *((uint4*)iv);
 

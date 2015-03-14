@@ -140,6 +140,9 @@ public:
     			const unsigned char **sigbuf, unsigned int *siglen,
 			int n);
 
+	void CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
+			unsigned char *digest, unsigned int digestlen);
+
 	float get_elapsed_ms_kernel();
 
 	static const int max_batch = 2048 / 2;

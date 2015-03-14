@@ -458,102 +458,6 @@ try_more:
     }
 }
 
-static void sign_test_latency_stream(rsa_context_mp *rsa, device_context *dev_ctx, int concurrency)
-{
-    int max_len = rsa->max_ptext_bytes();
-
-    printf("# msg	throughput(RSA msgs/s)\n");
-
-    for (int k = 1; k <= rsa_context::max_batch; k *= 2)
-    {
-        //if (k == 32)
-        //	k = 30; 	// GTX285 has 30 SMs :)
-
-        uint64_t begin;
-        uint64_t end;
-
-        for (int s = 1; s <= concurrency; s++)
-        {
-            for (int i = 0; i < k; i++)
-            {
-                ptext_len_str[s][i] = (rand() % max_len + 1);
-                ctext_len_str[s][i] = sizeof(ctext_str[s][i]);
-                dtext_len_str[s][i] = sizeof(dtext_str[s][i]);
-                set_random(ptext_str[s][i], ptext_len_str[s][i]);
-
-                rsa->RSA_sign_message(ptext_str[s][i], ptext_len_str[s][i],
-                            ctext_str[s][i], (unsigned int)ctext_len_str[s][i]);
-
-
-                dtext_arr_str[s][i] = dtext_str[s][i];
-                ctext_arr_str[s][i] = ctext_str[s][i];
-                ptext_arr_str[s][i] = ptext_str[s][i];
-
-            }
-        }
-
-
-
-        //warmup
-        for (int i = 1; i < concurrency; i++)
-        {
-            rsa->RSA_verify_message_stream((unsigned char **)ptext_arr_str[i], (unsigned int*)ptext_len_str[i],
-                                (unsigned char **)ctext_arr_str[i], (unsigned int*)ctext_len_str[i],
-                                k, i);
-
-            rsa->sync(i, true);
-        }
-
-        begin = get_usec();
-        int rounds = 200;
-        int count  = 0;
-        do
-        {
-            int stream = 0;
-            for (int i = 1; i <= concurrency; i++)
-            {
-                if (dev_ctx->get_state(i) == READY)
-                {
-                    stream = i;
-                    break;
-                }
-                else
-                {
-                    if (rsa->sync(i, false))
-                    {
-                        count++;
-                        if (count == concurrency)
-                            begin = get_usec();
-                    }
-                }
-            }
-            if (stream != 0)
-            {
-                rsa->RSA_verify_message_stream((unsigned char **)ptext_arr_str[stream], (unsigned int*)ptext_len_str[stream],
-                                (unsigned char **)ctext_arr_str[stream], (unsigned int*)ctext_len_str[stream],
-                                k, stream);
-            }
-            else
-            {
-                usleep(0);
-            }
-        }
-        while (count < rounds + concurrency);
-        end = get_usec();
-
-        for (int s = 1; s <= concurrency; s++)
-            rsa->sync(s, true);
-
-
-
-        double throughput = (k * 1000000.0) * (count - concurrency) / (end - begin);
-        printf("%4d *%2d\t%.2f\n",
-               k,
-               concurrency,
-               throughput);
-    }
-}
-
 void test_rsa_cpu()
 {
     printf("------------------------------------------\n");
@@ -683,6 +587,13 @@ void test_rsa_mp_stream(unsigned num_stream)
 void sign_test_rsa_cpu()
 {
     printf("------------------------------------------\n");
+    printf("RSA512, SIGNATURE, CPU, random\n");
+    printf("------------------------------------------\n");
+    rsa_context rsa512_cpu(512);
+    sign_test_latency(&rsa512_cpu, 512);
+    sign_test_correctness(&rsa512_cpu, 512, 20);
+
+    printf("------------------------------------------\n");
     printf("RSA1024, SIGNATURE, CPU, random\n");
     printf("------------------------------------------\n");
     rsa_context rsa1024_cpu(1024);
@@ -764,39 +675,6 @@ void sign_test_rsa_mp()
     rsa4096_mp.set_device_context(&dev_ctx);
     sign_test_latency(&rsa4096_mp, 4096);
     sign_test_correctness(&rsa4096_mp, 4096, 20);
-}
-void sign_test_rsa_mp_stream(unsigned num_stream)
-{
-    device_context dev_ctx;
-    dev_ctx.init(10485760, num_stream);
-
-    printf("------------------------------------------\n");
-    printf("RSA512, SIGNATURE, GPU (MP), random\n");
-    printf("------------------------------------------\n");
-    rsa_context_mp rsa512_mp(512);
-    rsa512_mp.set_device_context(&dev_ctx);
-    sign_test_latency_stream(&rsa512_mp, &dev_ctx, num_stream);
-
-    printf("------------------------------------------\n");
-    printf("RSA1024, SIGNATURE, GPU (MP), random\n");
-    printf("------------------------------------------\n");
-    rsa_context_mp rsa1024_mp(1024);
-    rsa1024_mp.set_device_context(&dev_ctx);
-    sign_test_latency_stream(&rsa1024_mp, &dev_ctx, num_stream);
-
-    printf("------------------------------------------\n");
-    printf("RSA2048, SIGNATURE, GPU (MP), random\n");
-    printf("------------------------------------------\n");
-    rsa_context_mp rsa2048_mp(2048);
-    rsa2048_mp.set_device_context(&dev_ctx);
-    sign_test_latency_stream(&rsa2048_mp, &dev_ctx, num_stream);
-
-    printf("------------------------------------------\n");
-    printf("RSA4096, SIGNATURE, GPU (MP), random\n");
-    printf("------------------------------------------\n");
-    rsa_context_mp rsa4096_mp(4096);
-    rsa4096_mp.set_device_context(&dev_ctx);
-    sign_test_latency_stream(&rsa4096_mp, &dev_ctx, num_stream);
 }
 
 void test_rsa_mp_cert(unsigned num_stream)
@@ -927,7 +805,9 @@ int main(int argc, char *argv[])
         {
             if (num_stream > 0)
             {
-                sign_test_rsa_mp_stream(num_stream);
+            	//Not implemented for signature
+            	assert(0);
+                //sign_test_rsa_mp_stream(num_stream);
             }
             else if (num_stream == 0)
             {

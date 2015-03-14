@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <iostream>
+#include <openssl/rand.h>
 
 #include "aes_kernel.h"
 #include "aes_context.hh"
@@ -18,6 +19,61 @@
 #include "aes_test.hh"
 
 #define MAX_FLOW_LEN 16384
+
+void gen_aes_cbc_data2(operation_batch_t *ops,
+		      unsigned          key_bits,
+		      unsigned          num_flows,
+		      unsigned          flow_len,
+		      bool              encrypt,
+		      unsigned char *m)
+{
+	assert(flow_len  > 0 && flow_len  <= MAX_FLOW_LEN);
+	assert(num_flows > 0 && num_flows <= 4096);
+	assert(key_bits == 128);
+	assert(ops != NULL);
+
+	//prepare buffer for data generation
+	ops->resize(num_flows);
+
+	//generate random data
+	for (operation_batch_t::iterator i = ops->begin();
+	     i != ops->end(); i++) {
+		(*i).destroy();
+
+		//input data
+		(*i).in_len  = flow_len;
+		(*i).in      = (uint8_t*)malloc(flow_len);
+		assert((*i).in != NULL);
+		//set_random((*i).in, flow_len);
+		memcpy((*i).in,m,flow_len);
+
+		//output data
+		(*i).out_len = flow_len;
+		(*i).out     = (uint8_t*)malloc(flow_len);
+		assert((*i).out != NULL);
+		set_random((*i).out, flow_len);
+
+		//key
+		(*i).key_len = key_bits / 8;
+		(*i).key     = (uint8_t*)malloc(key_bits / 8);
+		assert((*i).key != NULL);
+		//set_random((*i).key, key_bits / 8);
+		memcpy((*i).key,"0000000000000000",key_bits / 8);
+
+		//iv
+		(*i).iv_len  = AES_IV_SIZE;
+		(*i).iv      = (uint8_t*)malloc(AES_IV_SIZE);
+		assert((*i).iv != NULL);
+		set_random((*i).iv, AES_IV_SIZE);
+
+		//set opcode
+		if (encrypt)
+			(*i).op = AES_ENC;
+		else
+			(*i).op = AES_DEC;
+	}
+}
+
 
 static bool test_correctness_aes_cbc_encrypt(unsigned key_bits,
 					     unsigned num_flows,
@@ -211,12 +267,15 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 
 	aes_enc_param_t param;
 	operation_batch_t ops;
+	unsigned char *msg = new unsigned char[flow_len];
+	RAND_bytes(msg,flow_len);
+
 	//generate test random test case
-	gen_aes_cbc_data(&ops,
+	gen_aes_cbc_data2(&ops,
 			 key_bits,
 			 num_flows,
 			 flow_len,
-			 true);
+			 true,msg);
 
 	//copy input to pinned page and prepare parameter for gpu
 	aes_cbc_encrypt_prepare(&ops, &param, pool);
@@ -250,9 +309,14 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 				    param.num_flows,
 				    param.tot_out_len,
 				    0);
-		cout<<endl<<"The hash for this round is:";
-		for (unsigned int g = 0; g < 16; g++) {
-			printf("%x", *(param.out+g));
+		cout<<endl<<"The hash for round "<<i<<" is:"<<endl;
+		for ( int g = 0; g < num_flows; g++) {
+			printf("The hash for message %d is: ",g);
+			for(int f=0;f<16;f++)
+			{
+				printf("%x",*(param.out+(g*16)+f));
+			}
+			cout<<endl;
 		}
 		cout<<endl;
 		aes_ctx.sync(0);
@@ -431,9 +495,9 @@ static void test_latency_stream_aes_cbc_decrypt(unsigned key_bits,
 void test_aes_enc(int size)
 {
 	printf("------------------------------------------\n");
-	printf("AES-128-CBC ENC, Size: %dKB\n", size / 1024);
+	printf("AES-128-HASH, Size: %dKB\n", size / 1024);
 	printf("------------------------------------------\n");
-	printf("#msg latency(usec) thruput(Mbps)\n");
+	printf("#msg latency(ms) thruput(Mbps)\n");
 	for (unsigned i = 1; i <= 4096;  i *= 2)
 		test_latency_aes_cbc_encrypt(128, i, size);
 
@@ -597,7 +661,8 @@ void gen_aes_cbc_data(operation_batch_t *ops,
 		(*i).key_len = key_bits / 8;
 		(*i).key     = (uint8_t*)malloc(key_bits / 8);
 		assert((*i).key != NULL);
-		set_random((*i).key, key_bits / 8);
+		//set_random((*i).key, key_bits / 8);
+		memcpy((*i).key,"0000000000000000",key_bits / 8);
 
 		//iv
 		(*i).iv_len  = AES_IV_SIZE;
@@ -612,6 +677,8 @@ void gen_aes_cbc_data(operation_batch_t *ops,
 			(*i).op = AES_DEC;
 	}
 }
+
+
 
 void aes_cbc_encrypt_prepare(operation_batch_t *ops,
 			     aes_enc_param_t   *param,

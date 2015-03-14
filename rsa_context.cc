@@ -90,8 +90,6 @@ void rsa_context::pub_encrypt(unsigned char *out, unsigned int *out_len,
 
 	assert(in_len <= max_ptext_bytes());
 
-
-
 	*out_len = RSA_public_encrypt(in_len, in, out, rsa, RSA_PKCS1_PADDING);
 	assert(*out_len != -1);
 }
@@ -109,6 +107,7 @@ void rsa_context::priv_decrypt(unsigned char *out, unsigned int *out_len,
 		BIGNUM *m1 = BN_new();
 		BIGNUM *m2 = BN_new();
 		BIGNUM *t = BN_new();
+
 		BN_nnmod(t, c, rsa->p, bn_ctx);
 		BN_mod_exp(m1, t, rsa->dmp1, rsa->p, bn_ctx);
 		BN_nnmod(t, c, rsa->q, bn_ctx);
@@ -146,7 +145,7 @@ void rsa_context::priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
 		priv_decrypt(out[i], &out_len[i], in[i], in_len[i]);
 }
 
-void CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
+void rsa_context::CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
 		unsigned char *digest, unsigned int digestlen)
 {
 		SHA_CTX sha_ctx = { 0 };
@@ -154,15 +153,12 @@ void CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
 
 	    rc = SHA1_Init(&sha_ctx);
 	    assert(rc ==1);
-	    //if (1 != rc) { handle_it(); status = EXIT_FAILURE; goto end; }
 
 	    rc = SHA1_Update(&sha_ctx, m, m_len);
 	    assert(rc ==1);
-	    //if (1 != rc) { handle_it(); status = EXIT_FAILURE; goto end; }
 
 	    rc = SHA1_Final(digest, &sha_ctx);
 	    assert(rc ==1);
-	    //if (1 != rc) { handle_it(); status = EXIT_FAILURE; goto end; }
 
 }
 
@@ -170,73 +166,108 @@ void CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
 int rsa_context::RSA_sign_message(const unsigned char *m, unsigned int m_len,
     			unsigned char *sigret, unsigned int siglen)
 {
-    int success = 0;
-	int bytes_needed = get_key_bits() / 8;
+	int success = 0;
+	int bytes_allowed = get_key_bits() / 8;
+	int digestLength = SHA_DIGEST_LENGTH;
+	unsigned char digest[digestLength];
 
-	//unsigned int digest_len = SHA512_DIGEST_LENGTH;
-	unsigned char digest[SHA_DIGEST_LENGTH];
+	//Check that the length of the digest is less than the max bytes allowed.
+	assert(digestLength <= bytes_allowed);
 
-	assert(m_len <= max_ptext_bytes());
+	//Calculate message digest.
+	CalculateMessageDigest(m, m_len, digest, digestLength);
 
-	CalculateMessageDigest(m, m_len, digest, SHA_DIGEST_LENGTH);
-
-    success = RSA_sign(NID_sha1, digest, sizeof(digest), sigret, &siglen, rsa);
-
-	//*out_len = RSA_public_encrypt(in_len, in, out, rsa, RSA_PKCS1_PADDING);
+	success = RSA_public_encrypt(digestLength, digest, sigret, rsa, RSA_PKCS1_PADDING);
+		if(success == 0)
+		{
+			printf("RSA_sign failed: %s\n",
+					ERR_error_string(ERR_get_error(),
+					NULL));
+		}
 	assert(success != 0);
+
+//	//Calculate signature
+//	BIGNUM *signature_bn = BN_new();
+//	BIGNUM *msg_bn = BN_bin2bn(digest, digestLength, NULL);
+//
+//	success = BN_mod_exp(signature_bn, msg_bn, rsa->e, rsa->n, bn_ctx);
+//	assert(BN_cmp(signature_bn, rsa->n) == -1);
+//
+//	if(success == 0)
+//	{
+//		printf("RSA_sign failed: %s\n",
+//				ERR_error_string(ERR_get_error(),
+//				NULL));
+//	}
+//
+//
+//	assert(success == 1);
+//
+//	BN_bn2bin(signature_bn ,sigret);
 }
 
 int rsa_context::RSA_verify_message(const unsigned char *m, unsigned int m_len,
     			const unsigned char *sigret, unsigned int siglen)
 {
-#if 0
+	int success = 0;
+    unsigned int bytes_needed = get_key_bits() / 8;
+    unsigned int digestLength = SHA_DIGEST_LENGTH;
+
+    unsigned char digest[bytes_needed];
+    unsigned char digestFromSignature[digestLength];
+
+    CalculateMessageDigest(m, m_len, digestFromSignature, SHA_DIGEST_LENGTH);
+
 	if (is_crt_available()) {
-		// This is only for debugging purpose.
-		// RSA_private_decrypt() is enough.
-		BIGNUM *c = BN_bin2bn(m, m_len, NULL);
-		assert(c != NULL);
-		assert(BN_cmp(c, rsa->n) == -1);
-		BIGNUM *m1 = BN_new();
-		BIGNUM *m2 = BN_new();
-		BIGNUM *t = BN_new();
-		BN_nnmod(t, c, rsa->p, bn_ctx);
-		BN_mod_exp(m1, t, rsa->dmp1, rsa->p, bn_ctx);
-		BN_nnmod(t, c, rsa->q, bn_ctx);
-		BN_mod_exp(m2, t, rsa->dmq1, rsa->q, bn_ctx);
-		BN_sub(t, m1, m2);
-		BN_mod_mul(t, t, rsa->iqmp, rsa->p, bn_ctx);
-		BN_mul(t, t, rsa->q, bn_ctx);
-		BN_add(t, m2, t);
-		int ret = remove_padding(sigbuf, sig_len, t);
-		assert(ret != -1);
-		BN_free(c);
-		BN_free(m1);
-		BN_free(m2);
-		BN_free(t);
-	} else {
-#endif
+			// This is only for debugging purpose.
+			// RSA_private_decrypt() is enough.
+			BIGNUM *c = BN_bin2bn(sigret, siglen, NULL);
+			assert(c != NULL);
+			assert(BN_cmp(c, rsa->n) == -1);
+			BIGNUM *m1 = BN_new();
+			BIGNUM *m2 = BN_new();
+			BIGNUM *t = BN_new();
+			BN_nnmod(t, c, rsa->p, bn_ctx);
+			BN_mod_exp(m1, t, rsa->dmp1, rsa->p, bn_ctx);
+			BN_nnmod(t, c, rsa->q, bn_ctx);
+			BN_mod_exp(m2, t, rsa->dmq1, rsa->q, bn_ctx);
+			BN_sub(t, m1, m2);
+			BN_mod_mul(t, t, rsa->iqmp, rsa->p, bn_ctx);
+			BN_mul(t, t, rsa->q, bn_ctx);
+			BN_add(t, m2, t);
+
+			//success = BN_mod_exp_simple(t, c, rsa->d, rsa->n, bn_ctx);
+//			if(success == 0)
+//				{
+//					printf("RSA_sign failed: %s\n",
+//							ERR_error_string(ERR_get_error(),
+//							NULL));
+//
+//				}
+//				assert(success == 1);
+
+			BN_bn2bin(t ,digest);
+			int ret = remove_padding(digest, &bytes_needed, t);
+			assert(ret != -1);
+			BN_free(c);
+			BN_free(m1);
+			BN_free(m2);
+			BN_free(t);
+	}
+	else
+	{
         int success = 0;
-        int bytes_needed = get_key_bits() / 8;
-        unsigned char digest[SHA_DIGEST_LENGTH];
-        //assert(*sigret >= bytes_needed);
 
         assert(m_len <= max_ptext_bytes());
 
-        CalculateMessageDigest(m, m_len, digest, SHA_DIGEST_LENGTH);
-
-        success = RSA_verify(NID_sha1, digest, sizeof(digest), sigret, siglen, rsa);
-
-        //printf("OpenSSL error: %s\n", ERR_error_string(ERR_get_error(), NULL));
+        success = RSA_private_decrypt(bytes_needed, sigret, digest, rsa, RSA_PKCS1_PADDING);
         assert(success != 0);
-//		int bytes_needed = get_key_bits() / 8;
-//		assert(*siglen >= bytes_needed);
-//
-//		*out_len = RSA_private_decrypt(m_len, in, out, rsa,
-//				RSA_PKCS1_PADDING);
-//		assert(*out_len != -1);
-#if 0
 	}
-#endif
+
+	if(memcmp(digest, digestFromSignature, SHA_DIGEST_LENGTH) == 0)
+		return 1;
+	else
+		return 0;
 }
 
 int rsa_context::RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
@@ -246,7 +277,11 @@ int rsa_context::RSA_verify_message_batch(const unsigned char **m, unsigned int 
 	assert(0 < n && n <= max_batch);
 
 	for (int i = 0; i < n; i++)
-		RSA_verify_message(m[i], m_len[i], sigbuf[i], siglen[i]); //out[i], &out_len[i], in[i], in_len[i]);
+		{
+			if (RSA_verify_message(m[i], m_len[i], sigbuf[i], siglen[i]) == 0)
+				return 0;
+		}
+	return 1;
 }
 
 float rsa_context::get_elapsed_ms_kernel()

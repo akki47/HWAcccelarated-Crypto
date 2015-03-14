@@ -99,8 +99,8 @@ public:
 	 * @param sigret Signature of the message.
 	 * @param siglen Length of the signature.
 	 */
-	virtual int RSA_verify_message(unsigned char *m, unsigned int m_len,
-    			unsigned char *sigbuf, unsigned int siglen);
+	virtual int RSA_verify_message(const unsigned char *m, unsigned int m_len,
+    			const unsigned char *sigbuf, unsigned int siglen);
 
 	/**
 	 *  Verify the signature with RSA algorithm using private key.
@@ -111,8 +111,8 @@ public:
 	 * @param siglen Length of the signature.
 	 * @param n Ciphertexts count.
 	 */
-	virtual int RSA_verify_message_batch(unsigned char **m, unsigned int *m_len,
-    			unsigned char **sigbuf, unsigned int *siglen,
+	virtual int RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
+    			const unsigned char **sigbuf, unsigned int *siglen,
 			int n);
 
     /**
@@ -128,7 +128,7 @@ public:
 	 */
 
 	int RSA_verify_message_stream(unsigned char **m, unsigned int *m_len,
-    			unsigned char **sigbuf, unsigned int *siglen,
+    			const unsigned char **sigbuf, unsigned int *siglen,
 			int n, unsigned int stream_id);
 
 
