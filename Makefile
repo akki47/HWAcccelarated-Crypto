@@ -44,7 +44,7 @@ GCC             := gcc
 # CUDA code generation flags
 GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
 GENCODE_SM20    := -gencode arch=compute_20,code=sm_20
-GENCODE_SM30    := -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
+GENCODE_SM30    := -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35, -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_50,code=compute_50
 GENCODE_FLAGS   :=  $(GENCODE_SM30) 
 
 # OS-specific build flags
@@ -113,13 +113,13 @@ $(OBJS_DIR):
 	mkdir $(OBJS_DIR)
 
 $(DEPS): $(SRC_FILES) $(HEADER_FILES)
-	$(CC) -MM -MP -x c++ $(CU_SRC_FILES) $(CC_SRC_FILES) | sed 's![^:]*.o:!objs/&!g' > Makefile.dep
+	$(CC) -pg -MM -MP -x c++ $(CU_SRC_FILES) $(CC_SRC_FILES) | sed 's![^:]*.o:!objs/&!g' > Makefile.dep
 
 $(OBJS_DIR)/%.o : %.cc
-	$(GCC) $(CCFLAGS) $(NVCCINCLUDES) -c $< -o $@
+	$(GCC) -g -pg -DMP_USE_64BIT=1 $(CCFLAGS) $(NVCCINCLUDES) -c $< -o $@
 
 $(OBJS_DIR)/%.o : %.cu
-	$(NVCC) -G $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
+	$(NVCC) -G -g -pg -DMP_USE_64BIT=1 $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
 
 .PHONY : clean
 

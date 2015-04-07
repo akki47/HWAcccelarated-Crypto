@@ -28,7 +28,7 @@ void gen_aes_cbc_data2(operation_batch_t *ops,
 		      unsigned char *m)
 {
 	assert(flow_len  > 0 && flow_len  <= MAX_FLOW_LEN);
-	assert(num_flows > 0 && num_flows <= 4096);
+	//assert(num_flows > 0 && num_flows <= 4096);
 	assert(key_bits == 128);
 	assert(ops != NULL);
 
@@ -281,7 +281,7 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 	aes_cbc_encrypt_prepare(&ops, &param, pool);
 
 	//gpu execution
-	aes_ctx.cbc_encrypt(param.memory_start,
+	/*aes_ctx.cbc_encrypt(param.memory_start,
 			    param.in_pos,
 			    param.key_pos,
 			    param.ivs_pos,
@@ -292,10 +292,10 @@ static void test_latency_aes_cbc_encrypt(unsigned key_bits,
 			    param.tot_out_len,
 			    0);
 
-	aes_ctx.sync(0);
+	aes_ctx.sync(0);*/
 
-	unsigned rounds = 100;
-	uint64_t elaplsed_time[100];
+	unsigned rounds = 10;
+	uint64_t elaplsed_time[10];
 
 	for (unsigned i = 0; i < rounds; i++ ) {
 		//gpu execution
@@ -498,12 +498,12 @@ void test_aes_enc(int size)
 	printf("AES-128-HASH, Size: %dKB\n", size / 1024);
 	printf("------------------------------------------\n");
 	printf("#msg latency(ms) thruput(Mbps)\n");
-	for (unsigned i = 1; i <= 4096;  i *= 2)
+	for (unsigned i = 1; i <= 8192;  i *= 2)
 		test_latency_aes_cbc_encrypt(128, i, size);
 
 	bool result = true;
 	printf("Correctness check (batch, random): ");
-	for (unsigned i = 1; i <= 4096; i *= 2)
+	for (unsigned i = 1; i <= 8192; i *= 2)
 		result = result && test_correctness_aes_cbc_encrypt(128, i, size);
 
 	if (!result)
@@ -539,7 +539,7 @@ void test_aes_enc_stream(int size, int num_stream)
 	printf("------------------------------------------\n");
 	printf("#msg #stream latency(usec) thruput(Mbps)\n");
 
-	for (unsigned i = 1; i <= 4096;  i *= 2)
+	for (unsigned i = 1; i <= 2048;  i *= 2) //change later
 		test_latency_stream_aes_cbc_encrypt(128, i, size, num_stream);
 
 }
@@ -587,7 +587,7 @@ int main(int argc, char *argv[])
 			if (i == argc)
 				goto parse_error;
 			num_stream = atoi(argv[i]);
-			if (num_stream > 16 || num_stream < 0)
+			if (num_stream > 32 || num_stream < 0) //change this later
 				goto parse_error;
 		} else if (strcmp(argv[i], "-l") == 0) {
 			i++;

@@ -17,7 +17,7 @@ INC += 	$(GPUCRYPTO_INCDIR)
 
 TARGET_DIR = ../bin/
 OBJ_DIR = ../objs/
-TARGET_FILES = rsa_test sha_test aes_test
+TARGET_FILES = rsa_test
 TARGETS = $(addprefix $(TARGET_DIR), $(TARGET_FILES))
 OBJS = $(addprefix $(OBJ_DIR), $(addsuffix .o, $(TARGET_FILES))) $(OBJ_DIR)common.o
 
@@ -30,10 +30,10 @@ $(OBJ_DIR):
 	mkdir $(OBJ_DIR)
 
 $(TARGET_DIR)% : $(OBJ_DIR)%.o |$(TARGET_DIR) $(OBJ_DIR) ../lib/libgpucrypto.a $(OBJ_DIR)common.o
-	g++ $(LIBDIR) -o $@ $<  $(OBJ_DIR)common.o $(CFLAGS) $(LIBS) -lstdc++
+	g++ -g -pg -DMP_USE_64BIT=1 $(LIBDIR) -o $@ $<  $(OBJ_DIR)common.o $(CFLAGS) $(LIBS) -lstdc++
 
 $(OBJ_DIR)%.o : %.cc
-	g++ $(CFLAGS) $(INC) $(NVINC) -c $< -o $@
+	g++ -g -pg -DMP_USE_64BIT=1 $(CFLAGS) $(INC) $(NVINC) -c $< -o $@
 
 .PHONY : clean
 clean:

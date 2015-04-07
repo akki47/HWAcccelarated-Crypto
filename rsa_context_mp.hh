@@ -91,45 +91,67 @@ public:
 			const unsigned char **in, const unsigned int *in_len,
 			int n, unsigned int stream_id);
 
-	/**
-	 * Verify the signature with RSA algorithm using private key.
-	 *
-	 * @param m message.
-	 * @param m_len message length.
-	 * @param sigret Signature of the message.
-	 * @param siglen Length of the signature.
-	 */
-	virtual int RSA_verify_message(const unsigned char *m, unsigned int m_len,
-    			const unsigned char *sigbuf, unsigned int siglen);
 
 	/**
-	 *  Verify the signature with RSA algorithm using private key.
+	 * Generate RSA signatures of the given messages.
 	 *
-	 * @param m message.
-	 * @param m_len message length.
-	 * @param sigret Signature of the message.
-	 * @param siglen Length of the signature.
-	 * @param n Ciphertexts count.
+	 * @param m messages.
+	 * @param m_len message lengths.
+	 * @param sigbuf Signatures of the message.
+	 * @param siglen Lengths of the signature.
+	 * @param n Number of messages.
 	 */
-	virtual int RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
-    			const unsigned char **sigbuf, unsigned int *siglen,
-			int n);
+	virtual void RA_sign_offline(const unsigned char **m, const unsigned int *m_len,
+    			unsigned char **sigret, unsigned int *siglen, int n);
 
-    /**
-	 * Verify the signature of the data with RSA algorithm using private key in a batch
-	 * It runs asynchronously. Use sync() for completion check.
+	/**
+	 * Generate RSA signatures of the given messages.
 	 *
-	 * @param m message.
-	 * @param m_len message length.
-	 * @param sigret Signature of the message.
-	 * @param siglen Length of the signature.
-	 * @param n Ciphertexts count.
+	 * @param m messages.
+	 * @param m_len message lengths.
+	 * @param sigbuf Signatures of the message.
+	 * @param siglen Lengths of the signature.
+	 * @param n Number of messages.
+	 */
+	virtual void RA_sign_offline_stream(const unsigned char **m, const unsigned int *m_len,
+				unsigned char **sigret, unsigned int *siglen, int n, unsigned int stream_id);
+
+	/**
+	 * Generate a CondensedRSA signature using signature tables.
+	 *
+	 * @param sigbuf Signatures of the message.
+	 * @param siglen Lengths of the signature.
+	 * @param condensed_sig Returned condensed signature.
+	 * @param n Number of messages.
+	 */
+	virtual void RA_sign_online(const unsigned char **sigbuf, const unsigned int *siglen,
+				unsigned char **condensed_sig, int n, int a);
+
+
+	virtual void RA_sign_online_stream(const unsigned char **sigbuf, const unsigned int *siglen,
+			unsigned char **condensed_sig, unsigned int *condensed_siglen, int n, int stream_id, int a);
+	/**
+	 *  Verify the condensed signature.
+	 *
+	 * @param m messages.
+	 * @param m_len message lengths.
+	 * @param condensed_sig Condensed signature.
+	 * @param n Number of messages.
+	 */
+	virtual int RA_verify(const unsigned char **m, const unsigned int *m_len,
+    			const unsigned char **condensed_sig, int n, int a);
+
+	/**
+	 *  Verify the condensed signature.
+	 *
+	 * @param m messages.
+	 * @param m_len message lengths.
+	 * @param condensed_sig Condensed signature.
+	 * @param n Number of messages.
 	 * @param stream_id Stream index. 1 <= stream_id <= max_stream
 	 */
-
-	int RSA_verify_message_stream(unsigned char **m, unsigned int *m_len,
-    			const unsigned char **sigbuf, unsigned int *siglen,
-			int n, unsigned int stream_id);
+	//virtual int RA_verify_stream(const unsigned char **m, const unsigned int *m_len,
+	//			const unsigned char *condensed_sig, int n, unsigned int stream_id);
 
 
 	/**
@@ -145,7 +167,10 @@ public:
 	 * @return true if the current operation on the stream is finished
 	 * otherwise false.
 	 */
-	bool sync(unsigned int stream_id, bool block = true, bool copy_result = true);
+	bool sync(unsigned int stream_id, int a = 0, bool block = true, bool copy_result = true);
+
+	void modular_Multiply(const unsigned char **m, const unsigned int *m_len,
+			const unsigned char *ret, int n);
 
 	static const unsigned int max_stream = MAX_STREAMS;
 
@@ -185,18 +210,28 @@ private:
 
 	struct mp_sw *sw_d;
 	WORD *n_d;
+	WORD *ns_d;
+
 	WORD *np_d;
+	WORD *nps_d;
+
 	WORD *r_sqr_d;
+	WORD *rs_sqr_d;
+
 	WORD *iqmp_d;
 
 	WORD mp_e[2][MAX_S];
 	WORD mp_n[2][MAX_S];
+	WORD mp_ns[MAX_S];
 	WORD mp_np[2][MAX_S];
+	WORD mp_nps[MAX_S];
 	WORD mp_r_sqr[2][MAX_S];
+	WORD mp_rs_sqr[MAX_S];
 	WORD mp_iqmp[MAX_S];
 
 	BIGNUM *r;
 	BIGNUM *r_inv[2];
+	BIGNUM *rs_inv;
 
 	BIGNUM *in_bn_p;
 	BIGNUM *in_bn_q;

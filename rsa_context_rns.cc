@@ -223,8 +223,8 @@ int rsa_context_rns::RSA_verify_message_batch(unsigned char **m, unsigned int *m
 						elapsed_ms_kernel);
 				// fallback. necessary?
 				assert(false);
-				rsa_context::RSA_verify_message(m[i], m_len[i],
-                                    sigbuf[i], siglen[i]);
+				//rsa_context::RSA_verify_message(m[i], m_len[i],
+                //                    sigbuf[i], siglen[i]);
 
 			} else {
 				BN_sub(t, out_bn[p], out_bn[q]);
@@ -268,8 +268,8 @@ int rsa_context_rns::RSA_verify_message_batch(unsigned char **m, unsigned int *m
 						elapsed_ms_kernel);
 				// fallback. necessary?
 				assert(false);
-				rsa_context::RSA_verify_message(m[i], m_len[i],
-                                    sigbuf[i], siglen[i]);
+				//rsa_context::RSA_verify_message(m[i], m_len[i],
+                 //                   sigbuf[i], siglen[i]);
 			} else {
 				//int ret = remove_padding(sigbuf[i], &siglen[i], out_bn[i]);
 				//assert(ret != -1);

@@ -39,6 +39,7 @@ static __device__ void mp_mul_dev(volatile WORD *ret,
 		WORD lo = mp_umul_lo(a[i], b[idx]);
 
 		ADD_CARRY(c[i + idx + 2], t[i + idx + 1], t[i + idx + 1], hi);
+		__syncthreads();
 		ADD_CARRY(c[i + idx + 1], t[i + idx], t[i + idx], lo);
 	}
 

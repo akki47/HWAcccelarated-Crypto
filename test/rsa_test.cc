@@ -7,6 +7,7 @@
 
 #include <typeinfo>
 
+#include "mp_modexp.h"
 #include "rsa_context.hh"
 #include "rsa_context_rns.hh"
 #include "rsa_context_mp.hh"
@@ -19,6 +20,7 @@ static unsigned char ctext[rsa_context::max_batch][512];
 static unsigned int ctext_len[rsa_context::max_batch];
 static unsigned char dtext[rsa_context::max_batch][512];
 static unsigned int dtext_len[rsa_context::max_batch];
+static unsigned char condensedSignature[rsa_context::max_batch][512];
 
 unsigned char ptext_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch][512];
 unsigned int ptext_len_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
@@ -32,22 +34,22 @@ unsigned char *ptext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_ba
 
 static void test_correctness(rsa_context *rsa, int iteration)
 {
-    int max_len = rsa->max_ptext_bytes();
+    int max_len = rsa->get_key_bits() / 8;
 
     /* step 1: no batch, static text */
     printf("correctness check (no batch): ");
     fflush(stdout);
 
-    strcpy((char *)ptext[0], "hello world, hello RSA");
-    ptext_len[0] = strlen((char *)ptext[0]) + 1;
+    ptext_len[0] = rand() % max_len;
     ctext_len[0] = sizeof(ctext[0]);
     dtext_len[0] = sizeof(dtext[0]);
+    set_random(ptext[0], ptext_len[0]);
 
     rsa->pub_encrypt(ctext[0], &ctext_len[0], ptext[0], ptext_len[0]);
     rsa->priv_decrypt(dtext[0], &dtext_len[0], ctext[0], ctext_len[0]);
 
     assert(dtext_len[0] == ptext_len[0]);
-    assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
+    assert(memcmp((char *)dtext[0], (char *)ptext[0], ptext_len[0]) == 0);
 
     printf("OK\n");
 
@@ -57,7 +59,7 @@ static void test_correctness(rsa_context *rsa, int iteration)
 
     for (int k = 0; k < iteration; k++)
     {
-        ptext_len[0] = (rand() % max_len) + 1;
+        ptext_len[0] = (rand() % max_len);
         ctext_len[0] = sizeof(ctext[0]);
         dtext_len[0] = sizeof(dtext[0]);
         set_random(ptext[0], ptext_len[0]);
@@ -66,7 +68,7 @@ static void test_correctness(rsa_context *rsa, int iteration)
         rsa->priv_decrypt(dtext[0], &dtext_len[0], ctext[0], ctext_len[0]);
 
         assert(dtext_len[0] == ptext_len[0]);
-        assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
+        assert(memcmp((char *)dtext[0], (char *)ptext[0], ptext_len[0]) == 0);
         printf(".");
         fflush(stdout);
     }
@@ -84,7 +86,7 @@ static void test_correctness(rsa_context *rsa, int iteration)
 
         for (int i = 0; i < k; i++)
         {
-            ptext_len[i] = (rand() % max_len) + 1;
+            ptext_len[i] = rand() % max_len;
             ctext_len[i] = sizeof(ctext[i]);
             dtext_len[i] = sizeof(dtext[i]);
             set_random(ptext[i], ptext_len[i]);
@@ -104,7 +106,7 @@ static void test_correctness(rsa_context *rsa, int iteration)
         for (int i = 0; i < k; i++)
         {
             if (dtext_len[i] != ptext_len[i] ||
-                    memcmp(dtext[i], ptext[i], dtext_len[i]) != 0)
+            		memcmp((char *)dtext[i], (char *)ptext[i], ptext_len[i]) != 0)
             {
                 correct = false;
             }
@@ -132,7 +134,7 @@ static void test_latency(rsa_context *rsa)
     bool warmed_up = false;
     int max_len = rsa->max_ptext_bytes();
 
-    printf("# msg	latency	CPU	kernel	throughput(RSA msgs/s)\n");
+    printf("# msg	latency(ms)	throughput(RSA msgs/s)\n");
 
     for (int k = 1; k <= rsa_context::max_batch; k *= 2)
     {
@@ -146,25 +148,27 @@ static void test_latency(rsa_context *rsa)
         uint64_t end;
 
         for (int i = 0; i < k; i++)
-        {
-            ptext_len[i] = (rand() % max_len) + 1;
-            ctext_len[i] = sizeof(ctext[i]);
-            dtext_len[i] = sizeof(dtext[i]);
-            set_random(ptext[i], ptext_len[i]);
+                {
+                    ptext_len[i] = rand() % max_len;
+                    ctext_len[i] = sizeof(ctext[i]);
+                    dtext_len[i] = sizeof(dtext[i]);
+                    set_random(ptext[i], ptext_len[i]);
 
-            rsa->pub_encrypt(ctext[i], &ctext_len[i],
-                             ptext[i], ptext_len[i]);
+                    rsa->pub_encrypt(ctext[i], &ctext_len[i],
+                                     ptext[i], ptext_len[i]);
 
-            dtext_arr[i] = dtext[i];
-            ctext_arr[i] = ctext[i];
-        }
+                    dtext_arr[i] = dtext[i];
+                    ctext_arr[i] = ctext[i];
+                }
 
 again:
         int iteration = 1;
         begin = get_usec();
 try_more:
+
+
         rsa->priv_decrypt_batch((unsigned char **)dtext_arr, dtext_len,
-                                (const unsigned char **)ctext_arr, (const unsigned int *)ctext_len,
+                               (const unsigned char **)ctext_arr, (const unsigned int *)ctext_len,
                                 k);
 
         end = get_usec();
@@ -184,13 +188,10 @@ try_more:
         }
 
         double total_time = (end - begin) / (iteration * 1000.0);
-        double kernel_time = rsa->get_elapsed_ms_kernel();
         double throughput = (k * 1000000.0) * iteration / (end - begin);
-        printf("%4d\t%.2f\t%.2f\t%.2f\t%.2f\n",
+        printf("%4d\t%.2f\t\t%.2f\n",
                k,
                total_time,
-               total_time - kernel_time,
-               kernel_time,
                throughput);
     }
 }
@@ -226,8 +227,6 @@ static void test_latency_stream(rsa_context_mp *rsa, device_context *dev_ctx, in
             }
         }
 
-
-
         //warmup
         for (int i = 1; i < concurrency; i++)
         {
@@ -239,7 +238,7 @@ static void test_latency_stream(rsa_context_mp *rsa, device_context *dev_ctx, in
         }
 
         begin = get_usec();
-        int rounds = 200;
+        int rounds = 50;
         int count  = 0;
         do
         {
@@ -289,172 +288,211 @@ static void test_latency_stream(rsa_context_mp *rsa, device_context *dev_ctx, in
     }
 }
 
-static void sign_test_correctness(rsa_context *rsa, int siglen, int iteration)
-{
-    int max_len = rsa->max_ptext_bytes();
-    int signatureVerified = 0;
-    /* step 1: no batch, static text */
-    printf("correctness check (no batch): ");
-    fflush(stdout);
-
-    strcpy((char *)ptext[0], "hello world, hello RSA");
-    ptext_len[0] = strlen((char *)ptext[0]) + 1;
-    ctext_len[0] = siglen / 8 ;  //sizeof(ctext[0]);
-    //dtext_len[0] = sizeof(dtext[0]);
-
-    rsa->RSA_sign_message(ptext[0], ptext_len[0], ctext[0], (unsigned int)ctext_len[0]);
-    signatureVerified = rsa->RSA_verify_message(ptext[0], ptext_len[0], ctext[0], ctext_len[0]);
-
-    assert(signatureVerified == 1);
-    //assert(dtext_len[0] == ptext_len[0]);
-    //assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
-
-    printf("OK\n");
-
-    /* step 2: no batch, random */
-    printf("correctness check (no batch, random, iterative): ");
-    fflush(stdout);
-
-    for (int k = 0; k < iteration; k++)
-    {
-        ptext_len[0] = (rand() % max_len) + 1;
-        ctext_len[0] = siglen / 8; //sizeof(ctext[0]);
-        //dtext_len[0] = sizeof(dtext[0]);
-        set_random(ptext[0], ptext_len[0]);
-
-        rsa->RSA_sign_message(ptext[0], ptext_len[0], ctext[0], (unsigned int)ctext_len[0]);
-
-        signatureVerified = 0;
-        signatureVerified = rsa->RSA_verify_message((const unsigned char*)ptext[0], (unsigned int)ptext_len[0], ctext[0], (unsigned int)ctext_len[0]);
-
-        //assert(dtext_len[0] == ptext_len[0]);
-        //assert(strcmp((char *)dtext[0], (char *)ptext[0]) == 0);
-        assert(signatureVerified == 1);
-
-        printf(".");
-        fflush(stdout);
-    }
-    printf("OK\n");
-
-    /* step 3: batch, random */
-    printf("correctness check (batch, random): ");
-    fflush(stdout);
-
-    bool all_correct = true;
-    for (int k = 1; k <= rsa_context::max_batch; k *= 2)
-    {
-        unsigned char *ctext_arr[rsa_context::max_batch];
-        unsigned char *ptext_arr[rsa_context::max_batch];
-
-        for (int i = 0; i < k; i++)
-        {
-            ptext_len[i] = (rand() % max_len) + 1;
-            ctext_len[i] = siglen / 8; //sizeof(ctext[i]);
-            //dtext_len[i] = sizeof(dtext[i]);
-            set_random(ptext[i], ptext_len[i]);
-
-
-            rsa->RSA_sign_message(ptext[i], ptext_len[i], ctext[i], (unsigned int)ctext_len[i]);
-
-            ptext_arr[i] = ptext[i];
-            ctext_arr[i] = ctext[i];
-        }
-
-        signatureVerified = 0;
-        signatureVerified = rsa->RSA_verify_message_batch((const unsigned char **)ptext_arr, (unsigned int*)ptext_len,
-                                (const unsigned char **)ctext_arr, (unsigned int*)ctext_len,
-                                k);
-
-        bool correct = true;
-        for (int i = 0; i < k; i++)
-        {
-            if (!signatureVerified)
-            {
-                correct = false;
-            }
-        }
-
-        if (correct)
-        {
-            printf(".");
-        }
-        else
-        {
-            printf("X");
-            all_correct = false;
-        }
-
-        fflush(stdout);
-    }
-
-    assert(all_correct);
-    printf("OK\n");
-}
+//static void sign_test_correctness(rsa_context *rsa, int siglen, int iteration)
+//{
+//    int max_len = rsa->max_ptext_bytes();
+//    int signatureVerified = 0;
+//
+//    /* step 1: no batch, static text */
+//    printf("correctness check (no batch): ");
+//    fflush(stdout);
+//
+//    ptext_len[0] = siglen / 8;
+//    ctext_len[0] = siglen / 8 ;
+//    set_random(ptext[0], ptext_len[0]);
+//
+//    //strcpy((char *)ptext[0], "hello world, hello RSA");
+//    //ptext_len[0] = strlen((char *)ptext[0]) + 1;
+//
+//    rsa->RSA_sign_message(ptext[0], ptext_len[0], ctext[0], (unsigned int)ctext_len[0]);
+//    signatureVerified = rsa->RSA_verify_message(ptext[0], ptext_len[0], ctext[0], ctext_len[0]);
+//
+//    assert(signatureVerified == 1);
+//
+//    printf("OK\n");
+//
+//    /* step 2: no batch, random */
+//    printf("correctness check (no batch, random, iterative): ");
+//    fflush(stdout);
+//
+//    for (int k = 0; k < iteration; k++)
+//    {
+//        ptext_len[0] = siglen / 8; //(rand() % max_len) + 1;
+//        ctext_len[0] = siglen / 8;
+//        set_random(ptext[0], ptext_len[0]);
+//
+//        rsa->RSA_sign_message(ptext[0], ptext_len[0], ctext[0], (unsigned int)ctext_len[0]);
+//
+//        signatureVerified = 0;
+//        signatureVerified = rsa->RSA_verify_message((unsigned char*)ptext[0], (unsigned int)ptext_len[0], ctext[0], (unsigned int)ctext_len[0]);
+//
+//        assert(signatureVerified == 1);
+//
+//        printf(".");
+//        fflush(stdout);
+//    }
+//    printf("OK\n");
+//
+//    /* step 3: batch, random */
+//    printf("correctness check (batch, random): ");
+//    fflush(stdout);
+//
+//    bool all_correct = true;
+//    for (int k = 1; k <= rsa_context::max_batch; k *= 2)
+//    {
+//        unsigned char *ctext_arr[rsa_context::max_batch];
+//        unsigned char *ptext_arr[rsa_context::max_batch];
+//
+//        for (int i = 0; i < k; i++)
+//        {
+//            ptext_len[i] = siglen / 8; //(rand() % max_len) + 1;
+//            ctext_len[i] = siglen / 8;
+//            set_random(ptext[i], ptext_len[i]);
+//
+//
+//            rsa->RSA_sign_message(ptext[i], ptext_len[i], ctext[i], (unsigned int)ctext_len[i]);
+//
+//            ptext_arr[i] = ptext[i];
+//            ctext_arr[i] = ctext[i];
+//        }
+//
+//        signatureVerified = 0;
+//        signatureVerified = rsa->RSA_verify_message_batch((unsigned char **)ptext_arr, (unsigned int*)ptext_len,
+//                                (const unsigned char **)ctext_arr, (unsigned int*)ctext_len,
+//                                k);
+//
+//        bool correct = true;
+//
+//        if (!signatureVerified)
+//        {
+//        	correct = false;
+//        }
+//
+//        if (correct)
+//        {
+//            printf(".");
+//        }
+//        else
+//        {
+//            printf("X");
+//            all_correct = false;
+//        }
+//
+//        fflush(stdout);
+//    }
+//
+//    assert(all_correct);
+//    printf("OK\n");
+//}
 
 static void sign_test_latency(rsa_context *rsa, int signature_len)
 {
     bool warmed_up = false;
-    int max_len = rsa->max_ptext_bytes();
+    int number_of_components = 8;
 
-    printf("# msg	latency	CPU	kernel	throughput(RSA msgs/s)\n");
+    printf("# msg	lSOff(ms)	lSOn(us)	lVerify(us)	tSOff(RSA sigs/s)	tSOn(RA csigs/s)	tVerify(RA csigs/s)\n");
 
-    for (int k = 1; k <= rsa_context::max_batch; k *= 2)
+    for (int k = 16; k <= rsa_context::max_batch; k *= 2)
     {
-        //if (k == 32)
-        //	k = 30; 	// GTX285 has 30 SMs :)
-
-        unsigned char *ctext_arr[rsa_context::max_batch];
         unsigned char *ptext_arr[rsa_context::max_batch];
-        //unsigned char *dtext_arr[rsa_context::max_batch];
+        unsigned char *ctext_arr[rsa_context::max_batch];
+        unsigned char *condensedSignature_arr[rsa_context::max_batch];
 
-        uint64_t begin;
-        uint64_t end;
+        uint64_t beginSignOffline;
+        uint64_t endSignOffline;
+        uint64_t beginSignOnline;
+        uint64_t endSignOnline;
+        uint64_t beginVerify;
+        uint64_t endVerify;
 
         for (int i = 0; i < k; i++)
         {
-            ptext_len[i] = (rand() % max_len) + 1;
+            ptext_len[i] = signature_len / 8;
             ctext_len[i] = signature_len / 8;
 
             set_random(ptext[i], ptext_len[i]);
 
-            rsa->RSA_sign_message(ptext[i], ptext_len[i],
-                            ctext[i], (unsigned int)ctext_len[i]);
-
             ptext_arr[i] = ptext[i];
             ctext_arr[i] = ctext[i];
+
+            //if(i <= k - number_of_components)
+            //{
+            	condensedSignature_arr[i] = condensedSignature[i];
+           // }
         }
 
-again:
-        int iteration = 1;
-        begin = get_usec();
-try_more:
-        rsa->RSA_verify_message_batch((const unsigned char **)ptext_arr, (unsigned int*)ptext_len,
-                                (const unsigned char **)ctext_arr, (unsigned int*)ctext_len ,
-                                k);
+        beginSignOffline = get_usec();
 
-        end = get_usec();
-        if (end - begin < 300000)
+        rsa->RA_sign_offline((const unsigned char**)ptext_arr, (const unsigned int*)ptext_len,
+                                        (unsigned char **)ctext_arr, (unsigned int*)ctext_len ,
+                                        k);
+
+        endSignOffline = get_usec();
+
+againSign:
+        int iterationSign = 1;
+        beginSignOnline = get_usec();
+try_moreSign:
+
+		rsa->RA_sign_online((const unsigned char **)ctext_arr, (const unsigned int*)ctext_len,
+				(unsigned char **)condensedSignature_arr, k, number_of_components);
+
+		endSignOnline = get_usec();
+        if (endSignOnline - beginSignOnline < 300000)
         {
-            iteration++;
+        	iterationSign++;
 
             if (!warmed_up)
             {
                 warmed_up = true;
-                goto again;
+                goto againSign;
             }
             else
-                goto try_more;
+                goto try_moreSign;
         }
 
-        double total_time = (end - begin) / (iteration * 1000.0);
-        double kernel_time = rsa->get_elapsed_ms_kernel();
-        double throughput = (k * 1000000.0) * iteration / (end - begin);
-        printf("%4d\t%.2f\t%.2f\t%.2f\t%.2f\n",
-               k,
-               total_time,
-               total_time - kernel_time,
-               kernel_time,
-               throughput);
+        warmed_up = false;
+
+againVerify:
+		int iterationVerify = 1;
+		beginVerify = get_usec();
+try_moreVerify:
+
+		rsa->RA_verify((const unsigned char**)ptext_arr, (const unsigned int*)ptext_len,
+				(const unsigned char**)condensedSignature_arr, k, number_of_components);
+
+		endVerify = get_usec();
+		if (endVerify - beginVerify < 300000)
+		{
+			iterationVerify++;
+
+			if (!warmed_up)
+			{
+				warmed_up = true;
+				goto againVerify;
+			}
+			else
+				goto try_moreVerify;
+		}
+
+
+        double total_time_sign_offline = (endSignOffline - beginSignOffline) / 1000.0;
+        double throughput_sign_offline = (k * 1000000.0) / (endSignOffline - beginSignOffline);
+
+        double total_time_sign_online = (endSignOnline - beginSignOnline) / (iterationSign);
+        double throughput_sign_online = ((k - number_of_components) * 1000000.0) * iterationSign / (endSignOnline - beginSignOnline);
+
+        double total_time_verify = (endVerify - beginVerify) / (iterationVerify);
+        double throughput_verify = ((k - number_of_components) * 1000000.0) * iterationVerify / (endVerify - beginVerify);
+
+        printf("%4d\t%.2f\t\t%.2f\t\t%.2f\t\t%.2f\t\t\t%.2f\t\t\t%.2f\n",
+        		k,
+        		total_time_sign_offline,
+        		total_time_sign_online,
+        		total_time_verify,
+        		throughput_sign_offline,
+        		throughput_sign_online,
+        		throughput_verify);
     }
 }
 
@@ -591,53 +629,53 @@ void sign_test_rsa_cpu()
     printf("------------------------------------------\n");
     rsa_context rsa512_cpu(512);
     sign_test_latency(&rsa512_cpu, 512);
-    sign_test_correctness(&rsa512_cpu, 512, 20);
+    //sign_test_correctness(&rsa512_cpu, 512, 20);
 
     printf("------------------------------------------\n");
     printf("RSA1024, SIGNATURE, CPU, random\n");
     printf("------------------------------------------\n");
     rsa_context rsa1024_cpu(1024);
     sign_test_latency(&rsa1024_cpu, 1024);
-    sign_test_correctness(&rsa1024_cpu, 1024, 20);
+    //sign_test_correctness(&rsa1024_cpu, 1024, 20);
 
     printf("------------------------------------------\n");
     printf("RSA2048, SIGNATURE, CPU, random\n");
     printf("------------------------------------------\n");
     rsa_context rsa2048_cpu(2048);
     sign_test_latency(&rsa2048_cpu, 2048);
-    sign_test_correctness(&rsa2048_cpu, 2048, 20);
+    //sign_test_correctness(&rsa2048_cpu, 2048, 20);
 
     printf("------------------------------------------\n");
     printf("RSA4096, SIGNATURE, CPU, random\n");
     printf("------------------------------------------\n");
     rsa_context rsa4096_cpu(4096);
     sign_test_latency(&rsa4096_cpu, 4096);
-    sign_test_correctness(&rsa4096_cpu, 4096, 20);
+    //sign_test_correctness(&rsa4096_cpu, 4096, 20);
 }
 
-void sign_test_rsa_rns()
-{
-    printf("------------------------------------------\n");
-    printf("RSA512, SIGNATURE, GPU (RNS), random\n");
-    printf("------------------------------------------\n");
-    rsa_context_rns rsa512_rns(512);
-    sign_test_latency(&rsa512_rns, 512);
-    sign_test_correctness(&rsa512_rns, 512, 20);
-
-    printf("------------------------------------------\n");
-    printf("RSA1024, SIGNATURE, GPU (RNS), random\n");
-    printf("------------------------------------------\n");
-    rsa_context_rns rsa1024_rns(1024);
-    sign_test_latency(&rsa1024_rns, 1024);
-    sign_test_correctness(&rsa1024_rns, 1024, 20);
-
-    printf("------------------------------------------\n");
-    printf("RSA2048, SIGNATURE, GPU (RNS), random\n");
-    printf("------------------------------------------\n");
-    rsa_context_rns rsa2048_rns(2048);
-    sign_test_latency(&rsa2048_rns, 2048);
-    sign_test_correctness(&rsa2048_rns, 2048, 20);
-}
+//void sign_test_rsa_rns()
+//{
+//    printf("------------------------------------------\n");
+//    printf("RSA512, SIGNATURE, GPU (RNS), random\n");
+//    printf("------------------------------------------\n");
+//    rsa_context_rns rsa512_rns(512);
+//    sign_test_latency(&rsa512_rns, 512);
+//    sign_test_correctness(&rsa512_rns, 512, 20);
+//
+//    printf("------------------------------------------\n");
+//    printf("RSA1024, SIGNATURE, GPU (RNS), random\n");
+//    printf("------------------------------------------\n");
+//    rsa_context_rns rsa1024_rns(1024);
+//    sign_test_latency(&rsa1024_rns, 1024);
+//    sign_test_correctness(&rsa1024_rns, 1024, 20);
+//
+//    printf("------------------------------------------\n");
+//    printf("RSA2048, SIGNATURE, GPU (RNS), random\n");
+//    printf("------------------------------------------\n");
+//    rsa_context_rns rsa2048_rns(2048);
+//    sign_test_latency(&rsa2048_rns, 2048);
+//    sign_test_correctness(&rsa2048_rns, 2048, 20);
+//}
 
 void sign_test_rsa_mp()
 {
@@ -650,7 +688,7 @@ void sign_test_rsa_mp()
     rsa_context_mp rsa512_mp(512);
     rsa512_mp.set_device_context(&dev_ctx);
     sign_test_latency(&rsa512_mp, 512);
-    sign_test_correctness(&rsa512_mp, 512, 20);
+    //sign_test_correctness(&rsa512_mp, 512, 20);
 
     printf("------------------------------------------\n");
     printf("RSA1024, SIGNATURE, GPU (MP), random\n");
@@ -658,7 +696,7 @@ void sign_test_rsa_mp()
     rsa_context_mp rsa1024_mp(1024);
     rsa1024_mp.set_device_context(&dev_ctx);
     sign_test_latency(&rsa1024_mp, 1024);
-    sign_test_correctness(&rsa1024_mp, 1024, 20);
+    //sign_test_correctness(&rsa1024_mp, 1024, 20);
 
     printf("------------------------------------------\n");
     printf("RSA2048, SIGNATURE, GPU (MP), random\n");
@@ -666,7 +704,7 @@ void sign_test_rsa_mp()
     rsa_context_mp rsa2048_mp(2048);
     rsa2048_mp.set_device_context(&dev_ctx);
     sign_test_latency(&rsa2048_mp, 2048);
-    sign_test_correctness(&rsa2048_mp, 2048,  20);
+    //sign_test_correctness(&rsa2048_mp, 2048,  20);
 
     printf("------------------------------------------\n");
     printf("RSA4096, SIGNATURE, GPU (MP), random\n");
@@ -674,7 +712,7 @@ void sign_test_rsa_mp()
     rsa_context_mp rsa4096_mp(4096);
     rsa4096_mp.set_device_context(&dev_ctx);
     sign_test_latency(&rsa4096_mp, 4096);
-    sign_test_correctness(&rsa4096_mp, 4096, 20);
+    //sign_test_correctness(&rsa4096_mp, 4096, 20);
 }
 
 void test_rsa_mp_cert(unsigned num_stream)
@@ -817,7 +855,7 @@ int main(int argc, char *argv[])
 
         if (rns)
         {
-            sign_test_rsa_rns();
+            //sign_test_rsa_rns();
         }
 
         if (cpu)

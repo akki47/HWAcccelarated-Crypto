@@ -106,46 +106,49 @@ public:
 			int n);
 
 	/**
-	 * Sign the message with RSA algorithm using public key.
+	 * Generate RSA signatures of the given messages.
 	 *
-	 * @param m message.
-	 * @param m_len message length.
-	 * @param sigret Signature of the message.
-	 * @param siglen Length of the signature.
+	 * @param m messages.
+	 * @param m_len message lengths.
+	 * @param sigbuf Signatures of the message.
+	 * @param siglen Lengths of the signature.
+	 * @param n Number of messages.
 	 */
-	virtual int RSA_sign_message(const unsigned char *m, unsigned int m_len,
-    			unsigned char *sigret, unsigned int siglen);
+	virtual void RA_sign_offline(const unsigned char **m, const unsigned int *m_len,
+    			unsigned char **sigret, unsigned int *siglen, int n);
 
 	/**
-	 * Verify the signature with RSA algorithm using private key.
+	 * Generate a CondensedRSA signature using signature tables.
 	 *
-	 * @param m message.
-	 * @param m_len message length.
-	 * @param sigret Signature of the message.
-	 * @param siglen Length of the signature.
+	 * @param sigbuf Signatures of the message.
+	 * @param siglen Lengths of the signature.
+	 * @param condensed_sig Returned condensed signature.
+	 * @param n Number of messages.
 	 */
-	virtual int RSA_verify_message(const unsigned char *m, unsigned int m_len,
-    			const unsigned char *sigbuf, unsigned int siglen);
+	virtual void RA_sign_online(const unsigned char **sigbuf, const unsigned int *siglen,
+				unsigned char **condensed_sig, int n, int a);
+
 
 	/**
-	 *  Verify the signature with RSA algorithm using private key.
+	 *  Verify the condensed signature.
 	 *
-	 * @param m message.
-	 * @param m_len message length.
-	 * @param sigret Signature of the message.
-	 * @param siglen Length of the signature.
-	 * @param n Ciphertexts count.
+	 * @param m messages.
+	 * @param m_len message lengths.
+	 * @param condensed_sig Condensed signature.
+	 * @param n Number of messages.
 	 */
-	virtual int RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
-    			const unsigned char **sigbuf, unsigned int *siglen,
-			int n);
+	virtual int RA_verify(const unsigned char **m, const unsigned int *m_len,
+    			const unsigned char **condensed_sig, int n, int a);
+
 
 	void CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
 			unsigned char *digest, unsigned int digestlen);
 
 	float get_elapsed_ms_kernel();
 
-	static const int max_batch = 2048 / 2;
+	static const int max_batch = 2048 * 8 / 2;
+
+	RSA *rsa;
 
 protected:
 	void dump_bn(BIGNUM *bn, const char *name);
@@ -153,7 +156,6 @@ protected:
 	// returns -1 if it fails
 	int remove_padding(unsigned char *out, unsigned int *out_len, BIGNUM *bn);
 
-	RSA *rsa;
 	BN_CTX *bn_ctx;
 
 	float elapsed_ms_kernel;

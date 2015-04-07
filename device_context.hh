@@ -7,8 +7,8 @@
 #include <cuda_runtime.h>
 #include <assert.h>
 
-#define MAX_STREAM 16
-#define MAX_BLOCKS 8192
+#define MAX_STREAM 32 //change this
+#define MAX_BLOCKS 8192*2
 
 /**
  * Enum for stream state

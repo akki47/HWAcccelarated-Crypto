@@ -8,8 +8,8 @@
 #include <cuda_runtime.h>
 #include <helper_cuda.h>
 
-#define MAX_STREAMS		16
-#define MP_MAX_NUM_PAIRS	1024
+#define MAX_STREAMS		0
+#define MP_MAX_NUM_PAIRS	16384
 
 #if MP_USE_64BIT == 1
 
@@ -24,6 +24,7 @@ typedef uint64_t WORD;
 #define S_2048	32
 
 #define MP_MSGS_PER_BLOCK (16 / (S / S_256))
+#define THREADS_PER_BLK 8
 
 #elif MP_USE_64BIT == 0
 
@@ -38,6 +39,7 @@ typedef uint32_t WORD;
 #define S_2048	64
 
 #define MP_MSGS_PER_BLOCK (8 / (S / S_256))
+#define THREADS_PER_BLK 8
 
 #else
 
@@ -129,6 +131,10 @@ void mp_copy(WORD *dst, const WORD *org, int word_len = MAX_S);
 void mp_get_sw(struct mp_sw *ret, const WORD *a, int word_len = MAX_S);
 
 void mp_modexp_crt(WORD *a, int cnt, int S, WORD *ret_d, WORD *ar_d,
+		struct mp_sw *sw_d, WORD *n_d, WORD *np_d, WORD *r_sqr_d,
+		cudaStream_t stream, unsigned int stream_id, uint8_t *checkbits = 0);
+
+void mp_modmult_crt(WORD *a, int cnt, int S, WORD *ret_d, WORD *ar_d,
 		struct mp_sw *sw_d, WORD *n_d, WORD *np_d, WORD *r_sqr_d,
 		cudaStream_t stream, unsigned int stream_id, uint8_t *checkbits = 0);
 

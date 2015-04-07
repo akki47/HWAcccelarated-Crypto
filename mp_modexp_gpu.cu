@@ -154,6 +154,71 @@ n_is_bigger:
 
 __device__ WORD ar_pow[MAX_STREAMS + 1][MP_SW_MAX_FRAGMENT / 2][2][MP_MAX_NUM_PAIRS][MAX_S];
 
+
+template<int S>
+__global__ void mp_modmult_kernel(int num_pairs,
+				 WORD *RET, const WORD *A,
+				 const struct mp_sw *_sw,
+				 const WORD *N, const WORD *NP, const WORD *R_SQR,
+				 unsigned int stream_id,
+				 uint8_t *checkbits = 0)
+{
+	__shared__ WORD n[S];
+	__shared__ WORD _ret[S * MP_MSGS_PER_BLOCK];
+	__shared__ WORD _tmp[S * MP_MSGS_PER_BLOCK];
+	__shared__ WORD _tmp2[S * MP_MSGS_PER_BLOCK];
+
+	WORD np;
+
+	const int limb_idx = threadIdx.x / S;
+	const int msg_idx = (blockIdx.x / 2) * MP_MSGS_PER_BLOCK + limb_idx;
+	const int pair_idx = blockIdx.x % 2;
+	const int idx = threadIdx.x % S;
+
+	if (msg_idx + 7 >= num_pairs)
+		return;
+
+	WORD *ret = _ret + limb_idx * S;
+	WORD *tmp = _tmp + limb_idx * S;
+	WORD *tmp2 = _tmp2 + limb_idx * S;
+
+	n[idx] = N[pair_idx * MAX_S + idx];
+	np = NP[pair_idx * MAX_S + 0];
+	ret[idx] = R_SQR[pair_idx * MAX_S + idx];
+
+	tmp[idx] = A[msg_idx * (2 * MAX_S) + pair_idx * MAX_S + idx];
+	mp_montmul_dev<S>(tmp, tmp, ret, n, np, limb_idx, idx);
+
+
+	for(int x=1;x<=7;x++)
+	{
+	tmp2[idx] = A[(msg_idx + x) * (2 * MAX_S) + pair_idx * MAX_S + idx]; //(m_x)
+	mp_montmul_dev<S>(tmp2, tmp2, ret, n, np, limb_idx, idx); //m_xr
+	//tmp = ar
+
+	mp_montmul_dev<S>(tmp, tmp2, tmp, n, np, limb_idx, idx); // tmp = ar*m_xr
+	}
+
+
+#if MP_MODEXP_OFFLOAD_POST
+	/*
+	 * now ret = (a^e)*r
+	 * calculate montmul(ret, 1) = (a^e)*r*(r^-1) = (a^e)
+	 */
+
+	ret[idx] = (idx == 0);
+	mp_montmul_dev<S>(ret, ret, tmp, n, np, limb_idx, idx);
+#endif
+
+	RET[msg_idx * (2 * MAX_S) + pair_idx * MAX_S + idx] = ret[idx];
+
+	sync_if_needed();
+	if (threadIdx.x == 0 && checkbits != 0)
+		*(checkbits + blockIdx.x) = 1;
+}
+
+
+
 template<int S>
 __global__ void mp_modexp_kernel(int num_pairs,
 				 WORD *RET, const WORD *A,
@@ -454,6 +519,93 @@ void mp_modexp_crt(WORD *a,
 		break;
 	case S_2048:
 		mp_modexp_kernel<S_2048><<<num_blocks, num_threads, 0, stream>>>(cnt,
+				(WORD *)ret_d,
+				(WORD *)a_d,
+				sw_d,
+				(WORD *)n_d,
+				(WORD *)np_d,
+				(WORD *)r_sqr_d,
+				stream_id,
+				checkbits);
+		break;
+	default:
+		fprintf(stderr, "unsupported S(%d)\n", S);
+		assert(false);
+	}
+
+	assert(cudaGetLastError() == cudaSuccess);
+}
+
+
+void mp_modmult_crt(WORD *a,
+		   int cnt, int S,
+		   WORD *ret_d, WORD *a_d,
+		   struct mp_sw *sw_d,
+		   WORD *n_d, WORD *np_d, WORD *r_sqr_d,
+		   cudaStream_t stream,
+		   unsigned int stream_id,
+		   uint8_t *checkbits
+)
+{
+	assert((cnt + MP_MSGS_PER_BLOCK - 1) / MP_MSGS_PER_BLOCK <= MP_MAX_NUM_PAIRS);
+
+	checkCudaErrors(cudaMemcpyAsync(a_d, a,
+				sizeof(WORD[2][MAX_S]) * cnt,
+				cudaMemcpyHostToDevice,
+				stream));
+
+	//unsigned int  num_threads = THREADS_PER_BLK;
+	//int           num_blocks  = ((cnt/8) + num_threads - 1) / num_threads;
+
+	int num_blocks = ((cnt + MP_MSGS_PER_BLOCK - 1) / MP_MSGS_PER_BLOCK) * 2;
+	int num_threads = S * MP_MSGS_PER_BLOCK;	/* # of threads per block */
+
+	/*
+	 * We use CPU wall time for the multi-stream case and
+	 * GPU event for the non-stream case.
+	 * At first glance it looks silly, but this way works around
+	 * two weird problems I found.
+	 * 1) For multiple streams, cudaEvent_t should not be used
+	 *    (otherwise copy and execution do not overlap at all)
+	 * - Sangjin
+	*/
+
+	switch (S) {
+	case S_256:
+		mp_modmult_kernel<S_256><<<num_blocks, num_threads, 0, stream>>>(cnt,
+				(WORD *)ret_d,
+				(WORD *)a_d,
+				sw_d,
+				(WORD *)n_d,
+				(WORD *)np_d,
+				(WORD *)r_sqr_d,
+				stream_id,
+				checkbits);
+		break;
+	case S_512:
+		mp_modmult_kernel<S_512><<<num_blocks, num_threads, 0, stream>>>(cnt,
+				(WORD *)ret_d,
+				(WORD *)a_d,
+				sw_d,
+				(WORD *)n_d,
+				(WORD *)np_d,
+				(WORD *)r_sqr_d,
+				stream_id,
+				checkbits);
+		break;
+	case S_1024:
+		mp_modmult_kernel<S_1024><<<num_blocks, num_threads, 0, stream>>>(cnt,
+				(WORD *)ret_d,
+				(WORD *)a_d,
+				sw_d,
+				(WORD *)n_d,
+				(WORD *)np_d,
+				(WORD *)r_sqr_d,
+				stream_id,
+				checkbits);
+		break;
+	case S_2048:
+		mp_modmult_kernel<S_2048><<<num_blocks, num_threads, 0, stream>>>(cnt,
 				(WORD *)ret_d,
 				(WORD *)a_d,
 				sw_d,

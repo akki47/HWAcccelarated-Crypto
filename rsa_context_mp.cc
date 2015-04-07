@@ -3,8 +3,10 @@
 #include <sys/time.h>
 #include <openssl/bn.h>
 #include <openssl/sha.h>
+#include <openssl/err.h>
 
 #include "rsa_context_mp.hh"
+#include "sha_context.hh"
 
 rsa_context_mp::rsa_context_mp(int keylen)
 	: rsa_context(keylen)
@@ -37,9 +39,14 @@ rsa_context_mp::~rsa_context_mp()
 	BN_free(out_bn_q);
 
 	checkCudaErrors(cudaFree(sw_d));
+
 	checkCudaErrors(cudaFree(n_d));
 	checkCudaErrors(cudaFree(np_d));
+	checkCudaErrors(cudaFree(ns_d));
+	checkCudaErrors(cudaFree(nps_d));
 	checkCudaErrors(cudaFree(r_sqr_d));
+	checkCudaErrors(cudaFree(rs_sqr_d));
+
 	checkCudaErrors(cudaFree(iqmp_d));
 
 	for (unsigned int i = 0; i <= max_stream; i++) {
@@ -104,14 +111,18 @@ void rsa_context_mp::priv_decrypt_stream(unsigned char **out,unsigned int *out_l
 		assert(in_bn_p != NULL);
 		assert(in_bn_q != NULL);
 
-		//assert(BN_cmp(in_bn_p, rsa->n) < 0);
+		assert(BN_cmp(in_bn_p, rsa->n) < 0);
 
 		BN_nnmod(in_bn_p, in_bn_p, rsa->p, bn_ctx);	// TODO: test BN_nnmod
 		BN_nnmod(in_bn_q, in_bn_q, rsa->q, bn_ctx);
 
-		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S), in_bn_p, word_len);
+		//BN_nnmod(in_bn_p, in_bn_p, rsa->n, bn_ctx);	// TODO: test BN_nnmod changed this (instead of C mod p just C mod n)
+		//BN_nnmod(in_bn_q, in_bn_q, rsa->n, bn_ctx);	//changed this (instead of C mod n just C mod n)
+
+		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S), in_bn_p, word_len); //need to change this
 		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S) + MAX_S, in_bn_q, word_len);
 	}
+
 
 	//copy in put and execute kernel
 	mp_modexp_crt(streams[stream_id].a,
@@ -131,47 +142,8 @@ void rsa_context_mp::priv_decrypt_stream(unsigned char **out,unsigned int *out_l
 	streams[stream_id].out_len = out_len;
 }
 
-
-int rsa_context_mp::RSA_verify_message(const unsigned char *m, unsigned int m_len,
-    			const unsigned char *sigbuf, unsigned int siglen)
-{
-    RSA_verify_message_batch(&m, &m_len, &sigbuf, &siglen, 1);
-}
-
-int rsa_context_mp::RSA_verify_message_batch(const unsigned char **m, unsigned int *m_len,
-    			const unsigned char **sigbuf, unsigned int *siglen,
-			int n)
-{
-	unsigned char ptext[rsa_context::max_batch][512];
-	unsigned int ptext_len[rsa_context::max_batch];
-
-	// by default, stream is not used
-	RSA_verify_message_stream((unsigned char**)ptext, (unsigned int*)ptext_len, sigbuf, siglen, n, 0);
-	sync(0);
-
-	int success = 0;
-	int bytes_allowed = get_key_bits() / 8;
-	int digestLength = SHA_DIGEST_LENGTH;
-	unsigned char digest[digestLength];
-
-	//Check that the length of the digest is less than the max bytes allowed.
-	assert(digestLength <= bytes_allowed);
-
-	for(int i = 0;i < n; i++)
-	{
-		//Calculate message digest.
-		CalculateMessageDigest(m[i], m_len[i], digest, digestLength);
-
-		if(memcmp(digest, ptext[i], SHA_DIGEST_LENGTH) != 0)
-			return 0;
-	}
-
-	return 1;
-}
-
-int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m_len,
-    			const unsigned char **sigbuf, unsigned int *siglen,
-			int n, unsigned int stream_id)
+void rsa_context_mp::RA_sign_online_stream(const unsigned char **sigbuf, const unsigned int *siglen,
+		unsigned char **condensed_sig, unsigned int *condensed_siglen, int n, int stream_id, int a)
 {
 	assert(is_crt_available());
 	assert(0 < n && n <= max_batch);
@@ -193,6 +165,180 @@ int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m
 		assert(in_bn_p != NULL);
 		assert(in_bn_q != NULL);
 
+		assert(BN_cmp(in_bn_p, rsa->n) < 0);
+
+		BN_nnmod(in_bn_p, in_bn_p, rsa->p, bn_ctx);	// TODO: test BN_nnmod
+		BN_nnmod(in_bn_q, in_bn_q, rsa->q, bn_ctx);
+
+		//BN_nnmod(in_bn_p, in_bn_p, rsa->n, bn_ctx);	// TODO: test BN_nnmod changed this (instead of C mod p just C mod n)
+		//BN_nnmod(in_bn_q, in_bn_q, rsa->n, bn_ctx);	//changed this (instead of C mod n just C mod n)
+
+		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S), in_bn_p, word_len); //need to change this
+		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S) + MAX_S, in_bn_q, word_len);
+	}
+
+
+	//copy in put and execute kernel
+	 mp_modmult_crt(streams[stream_id].a,
+			n, word_len,
+			streams[stream_id].ret_d, streams[stream_id].a_d,
+			sw_d,
+			n_d,
+			np_d,
+			r_sqr_d,
+		      dev_ctx_->get_stream(stream_id),
+		      stream_id,
+		      dev_ctx_->get_dev_checkbits(stream_id));
+
+
+	streams[stream_id].n = n;
+	streams[stream_id].out = condensed_sig;
+	streams[stream_id].out_len = condensed_siglen;
+}
+
+
+void rsa_context_mp::RA_sign_offline(const unsigned char **m, const unsigned int *m_len,
+    			unsigned char **sigret, unsigned int *siglen, int n)
+{
+
+	int signatureLength = get_key_bits() / 8;
+	int digestLength = SHA_DIGEST_LENGTH;
+
+	unsigned char digest[n][digestLength];
+	unsigned char digestPadded[n][signatureLength];
+	unsigned int digestPadded_len[n];
+
+	unsigned char *digest_arr[n];
+	unsigned char *digestPadded_arr[n];
+
+	device_context dev_ctx;
+	dev_ctx.init(n * 512 * 2.2, 0);
+	sha_context sha_ctx(&dev_ctx);
+
+	for(int i = 0;i < n; i++)
+	{
+		digest_arr[i] = digest[i];
+		digestPadded_arr[i] = digestPadded[i];
+		digestPadded_len[i] = signatureLength;
+	}
+
+	sha_ctx.calculate_sha1(m, m_len, digest_arr, n);
+
+	for(int i = 0; i < n; i++)
+	{
+		//Pad the hashed message
+		memset(digestPadded[i], 0, signatureLength - 20);
+		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+	}
+
+	// by default, stream is not used
+	RA_sign_offline_stream((const unsigned char **)digestPadded_arr, (const unsigned int *)digestPadded_len, sigret, siglen, n, 0);
+	sync(0);
+}
+
+void rsa_context_mp::RA_sign_online(const unsigned char **sigbuf, const unsigned int *siglen,
+		unsigned char **condensed_sig, int n, int a)
+{
+
+	int success;
+	unsigned int signatureLength = get_key_bits() / 8;
+	int digestLength = SHA_DIGEST_LENGTH;
+
+	unsigned char *condensedSignature_arr[n];
+	unsigned int condensedSignature_len[n];
+
+	for(int i = 0;i < n ; i++)
+	{
+		condensedSignature_arr[i] = condensed_sig[i];
+	}
+
+	RA_sign_online_stream(sigbuf, siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, a);
+	sync(0, a);
+}
+
+int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len,
+		const unsigned char **condensed_sig, int n, int a)
+{
+	int success = 0;
+	int signatureLength = get_key_bits() / 8;
+
+	unsigned char digest[n][SHA_DIGEST_LENGTH];
+	unsigned char digestPadded[n][signatureLength];
+	unsigned char multipliedDigest[n][signatureLength];
+
+	unsigned char *digest_arr[n];
+	unsigned char *multipliedDigest_arr[n];
+
+	unsigned int digestLength[n];
+	unsigned int multipliedHashLength[n];
+
+	for(int i = 0;i < n; i++)
+	{
+		digest_arr[i] = digest[i];
+		multipliedDigest_arr[i] = multipliedDigest[i];
+	}
+
+	//Calculate SHA Hashes in GPU
+	device_context dev_ctx;
+	dev_ctx.init(n * 512 * 2.2, 0);
+	sha_context sha_ctx(&dev_ctx);
+	sha_ctx.calculate_sha1(m, m_len, digest_arr, n);
+
+	for(int i = 0; i < n; i++)
+	{
+		digestLength[i] = signatureLength;
+		digest_arr[i] = digestPadded[i];
+
+		//Pad the hashed message
+		memset(digestPadded[i], 0, signatureLength - 20);
+		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+	}
+
+	RA_sign_online_stream((const unsigned char **)digest_arr, (const unsigned int *)digestLength, multipliedDigest_arr, multipliedHashLength, n , 0, a);
+	sync(0, a);
+
+	BIGNUM *digest_bn = BN_new();
+	BIGNUM *condensedSignature_bn = BN_new();
+
+	for(int i = 0;i < n - a ; i++)
+	{
+		BN_one(digest_bn);
+		BN_zero(condensedSignature_bn);
+
+		BN_bin2bn(condensed_sig[i], signatureLength, condensedSignature_bn);
+		BN_mod_exp(condensedSignature_bn, condensedSignature_bn, rsa->e, rsa->n, bn_ctx);
+		BN_bin2bn(multipliedDigest[i], multipliedHashLength[i], digest_bn);
+
+		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
+	}
+
+	return 1;
+}
+
+
+void rsa_context_mp::RA_sign_offline_stream(const unsigned char **m, const unsigned int *m_len,
+		unsigned char **sigret, unsigned int *siglen, int n, unsigned int stream_id)
+{
+	assert(is_crt_available());
+	assert(0 < n && n <= max_batch);
+	assert(n <= MP_MAX_NUM_PAIRS);
+	assert(stream_id <= max_stream);
+	assert(dev_ctx_ != NULL);
+	assert(dev_ctx_->get_state(stream_id) == READY);
+	dev_ctx_->set_state(stream_id, WAIT_KERNEL);
+
+	int word_len = (get_key_bits() / 2) / BITS_PER_WORD;
+	int S = word_len;
+	int num_blks = ((n + MP_MSGS_PER_BLOCK - 1) / MP_MSGS_PER_BLOCK) * 2;
+	dev_ctx_->clear_checkbits(stream_id, num_blks);
+	streams[stream_id].post_launched = false;
+
+	for (int i = 0; i < n; i++) {
+		BN_bin2bn(m[i], m_len[i], in_bn_p);
+		BN_bin2bn(m[i], m_len[i], in_bn_q);
+		assert(in_bn_p != NULL);
+		assert(in_bn_q != NULL);
+
 		//assert(BN_cmp(in_bn_p, rsa->n) < 0);
 
 		BN_nnmod(in_bn_p, in_bn_p, rsa->p, bn_ctx);	// TODO: test BN_nnmod
@@ -201,6 +347,7 @@ int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m
 		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S), in_bn_p, word_len);
 		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S) + MAX_S, in_bn_q, word_len);
 	}
+
 
 	//copy in put and execute kernel
 	mp_modexp_crt(streams[stream_id].a,
@@ -216,11 +363,11 @@ int rsa_context_mp::RSA_verify_message_stream(unsigned char **m, unsigned int *m
 
 
 	streams[stream_id].n = n;
-	streams[stream_id].out = m;
-	streams[stream_id].out_len = m_len;
+	streams[stream_id].out = sigret;
+	streams[stream_id].out_len = siglen;
 }
 
-bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
+bool rsa_context_mp::sync(unsigned int stream_id, int a, bool block, bool copy_result)
 {
 	assert(stream_id <= max_stream);
 	int word_len = (get_key_bits() / 2) / BITS_PER_WORD;
@@ -260,7 +407,7 @@ bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 
 			checkCudaErrors(cudaMemcpy(streams[stream_id].ret,
 						      streams[stream_id].ret_d,
-						      sizeof(WORD[2][MAX_S]) * streams[stream_id].n,
+						      sizeof(WORD[2][MAX_S]) * (streams[stream_id].n),
 						      cudaMemcpyDeviceToHost));//,
 						      //dev_ctx_->get_stream(stream_id)));
 			dev_ctx_->sync(stream_id, true);
@@ -271,21 +418,11 @@ bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 		}
 
 		//move result to out from gathred buffer
-		for (int i = 0; i < streams[stream_id].n; i++) {
+		for (int i = 0; i < streams[stream_id].n ; i++) {
 			int rsa_bytes = get_key_bits() / 8;
 
-			int ret = RSA_padding_check_PKCS1_type_2(streams[stream_id].out[i],
-								 streams[stream_id].out_len[i],
-								 (unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + 1,
-								 rsa_bytes - 1,
-								 rsa_bytes);
-			if (ret == -1) {
-				for (int j = 0; j < 2 * word_len * (int)sizeof(WORD); j++)
-					printf("%02x ", *(((unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + j)));
-				printf("\n");
-				assert(false);
-			}
-			streams[stream_id].out_len[i] = ret;
+			memcpy(streams[stream_id].out[i], (unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)), rsa_bytes);
+			streams[stream_id].out_len[i] = rsa_bytes;
 		}
 
 		return true;
@@ -332,21 +469,11 @@ bool rsa_context_mp::sync(unsigned int stream_id, bool block, bool copy_result)
 			return false;
 
 		//move result to out from gathred buffer
-		for (int i = 0; i < streams[stream_id].n; i++) {
+		for (int i = 0; i < streams[stream_id].n - a; i++) {
 			int rsa_bytes = get_key_bits() / 8;
 
-			int ret = RSA_padding_check_PKCS1_type_2(streams[stream_id].out[i],
-								 streams[stream_id].out_len[i],
-								 (unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + 1,
-								 rsa_bytes - 1,
-								 rsa_bytes);
-			if (ret == -1) {
-				for (int j = 0; j < 2 * word_len * (int)sizeof(WORD); j++)
-					printf("%02x ", *(((unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)) + j)));
-				printf("\n");
-				assert(false);
-			}
-			streams[stream_id].out_len[i] = ret;
+			memcpy(streams[stream_id].out[i], (unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)), rsa_bytes);
+			streams[stream_id].out_len[i] = rsa_bytes;
 		}
 
 		dev_ctx_->set_state(stream_id, READY);
@@ -439,6 +566,7 @@ void rsa_context_mp::gpu_setup()
 
 	checkCudaErrors(cudaMalloc(&np_d, sizeof(mp_np[0]) * 2));
 	checkCudaErrors(cudaMemcpy(np_d, mp_np, sizeof(mp_np[0]) * 2, cudaMemcpyHostToDevice));
+
 
 	checkCudaErrors(cudaEventCreate(&begin_evt));
 	checkCudaErrors(cudaEventCreate(&end_evt));

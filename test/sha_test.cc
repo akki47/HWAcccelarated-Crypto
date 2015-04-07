@@ -4,7 +4,10 @@
 #include <sys/time.h>
 #include <typeinfo>
 #include <stdint.h>
-#include <openssl/hmac.h>
+#include <openssl/sha.h>
+#include <stdio.h>
+#include <iostream>
+#include <openssl/rand.h>
 
 #include <time.h>
 
@@ -15,12 +18,12 @@
 #include "cuda_mem_pool.hh"
 #include "common.hh"
 
-#define HMAC_SHA1_HASH_SIZE 20
+#define SHA1_HASH_SIZE 20
 #define MAX_FLOW_LEN 16384
 
 #define max(a,b) ((a >= b)?(a):(b))
 
-typedef struct hmac_sha1_param
+typedef struct sha1_param
 {
 	uint8_t         *memory_start;
 	unsigned long   pkt_offset_pos;
@@ -30,10 +33,53 @@ typedef struct hmac_sha1_param
 	unsigned        total_size;
 	unsigned        num_flows;
 	uint8_t         *out;
-} hmac_sha1_param_t;
+} sha1_param_t;
+
+void gen_sha1_data2(operation_batch_t *ops,
+			unsigned   int       num_flows,
+			unsigned  int        *flow_len)
+{
+	//assert(flow_len  > 0 && flow_len  <= MAX_FLOW_LEN);
+	assert(num_flows > 0 && num_flows <= 4096);
+	assert(ops != NULL);
+
+	//prepare buffer for data generation
+	ops->resize(num_flows);
+
+	int count=0;
+	//generate random data
+	for (operation_batch_t::iterator i = ops->begin();
+	     i != ops->end(); i++) {
+		(*i).destroy();
+
+		//input data
+		(*i).in_len  = flow_len[count];
+		(*i).in      = (uint8_t*)malloc(flow_len[count]);
+		assert((*i).in != NULL);
+		set_random((*i).in, flow_len[count]);
+		//memcpy((*i).in,m[count],flow_len[count]);
+
+		//output data
+		(*i).out_len = SHA1_HASH_SIZE;
+		(*i).out     = (uint8_t*)malloc(SHA1_HASH_SIZE);
+		assert((*i).out != NULL);
+		set_random((*i).out, SHA1_HASH_SIZE);
+
+		//key
+		(*i).key_len = MAX_KEY_SIZE;
+		(*i).key     = (uint8_t*)malloc(MAX_KEY_SIZE);
+		assert((*i).key != NULL);
+		set_random((*i).key, MAX_KEY_SIZE);
+
+		(*i).op = SHA_1;
+		count++;
+
+	}
+
+}
 
 
-void gen_hmac_sha1_data(operation_batch_t *ops,
+void gen_sha1_data(operation_batch_t *ops,
 			unsigned          num_flows,
 			unsigned          flow_len)
 {
@@ -56,10 +102,10 @@ void gen_hmac_sha1_data(operation_batch_t *ops,
 		set_random((*i).in, flow_len);
 
 		//output data
-		(*i).out_len = HMAC_SHA1_HASH_SIZE;
-		(*i).out     = (uint8_t*)malloc(HMAC_SHA1_HASH_SIZE);
+		(*i).out_len = SHA1_HASH_SIZE;
+		(*i).out     = (uint8_t*)malloc(SHA1_HASH_SIZE);
 		assert((*i).out != NULL);
-		set_random((*i).out, HMAC_SHA1_HASH_SIZE);
+		set_random((*i).out, SHA1_HASH_SIZE);
 
 		//key
 		(*i).key_len = MAX_KEY_SIZE;
@@ -67,13 +113,13 @@ void gen_hmac_sha1_data(operation_batch_t *ops,
 		assert((*i).key != NULL);
 		set_random((*i).key, MAX_KEY_SIZE);
 
-		(*i).op = HMAC_SHA1;
+		(*i).op = SHA_1;
 	}
 
 }
 
-void hmac_sha1_prepare(operation_batch_t *ops,
-		       hmac_sha1_param_t *param,
+void sha1_prepare(operation_batch_t *ops,
+		       sha1_param_t *param,
 		       pinned_mem_pool   *pool)
 {
 	assert(ops != NULL);
@@ -102,7 +148,7 @@ void hmac_sha1_prepare(operation_batch_t *ops,
 	keys       = (uint8_t  *)pool->alloc(num_flows * MAX_KEY_SIZE);
 	in         = (uint8_t  *)pool->alloc(tot_in_size);
 	lengths     = (uint16_t *)pool->alloc(sizeof(uint16_t) * num_flows);
-	out        = (uint8_t  *)pool->alloc(HMAC_SHA1_HASH_SIZE * num_flows);
+	out        = (uint8_t  *)pool->alloc(SHA1_HASH_SIZE * num_flows);
 
 	assert(pkt_offset != NULL);
 	assert(keys       != NULL);
@@ -140,8 +186,8 @@ void hmac_sha1_prepare(operation_batch_t *ops,
 }
 
 
-void hmac_sha1_post(operation_batch_t *ops,
-		    hmac_sha1_param_t   *param)
+void sha1_post(operation_batch_t *ops,
+		    sha1_param_t   *param)
 {
 	assert(ops != NULL);
 	assert(ops->size() > 0);
@@ -157,21 +203,23 @@ void hmac_sha1_post(operation_batch_t *ops,
 }
 
 
-bool verify_hmac_sha1(operation_batch_t *ops)
+bool verify_sha1(operation_batch_t *ops)
 {
 	for (operation_batch_t::iterator i = ops->begin();
 	     i != ops->end(); i++) {
-		uint8_t out_temp[HMAC_SHA1_HASH_SIZE];
+		uint8_t out_temp[SHA1_HASH_SIZE];
 
-		unsigned len;
-		HMAC(EVP_sha1(),
-		     (*i).key,
-		     (*i).key_len,
-		     (*i).in,
-		     (*i).in_len,
-		     out_temp,
-		     &len);
-		assert(len == HMAC_SHA1_HASH_SIZE);
+		SHA_CTX sha_ctx = { 0 };
+		int rc = 1;
+
+	    rc = SHA1_Init(&sha_ctx);
+	    assert(rc ==1);
+
+	    rc = SHA1_Update(&sha_ctx, (*i).in, (*i).in_len);
+	    assert(rc ==1);
+
+	    rc = SHA1_Final(out_temp, &sha_ctx);
+	    assert(rc ==1);
 
 		if (memcmp(out_temp, (*i).out, (*i).out_len) != 0) {
 			return false;
@@ -181,7 +229,7 @@ bool verify_hmac_sha1(operation_batch_t *ops)
 }
 
 
-static bool test_correctness_hmac_sha1(unsigned  num_flows, unsigned flow_len)
+static bool test_correctness_sha1(unsigned  num_flows, unsigned flow_len)
 {
 	device_context dev_ctx;
 	dev_ctx.init(104857600, 0);
@@ -192,12 +240,19 @@ static bool test_correctness_hmac_sha1(unsigned  num_flows, unsigned flow_len)
 	pool->init(104857600);
 
 	operation_batch_t ops;
-	hmac_sha1_param_t param;
+	sha1_param_t param;
 
-	gen_hmac_sha1_data(&ops, num_flows, flow_len);
-	hmac_sha1_prepare(&ops, &param, pool);
+	unsigned int *flowLengths = new unsigned int[num_flows];
 
-	sha_ctx.hmac_sha1((void*)param.memory_start,
+	for(unsigned int i=0;i<num_flows;i++)
+	{
+		flowLengths[i] = 512; //(rand() % flow_len) + 1;
+	}
+
+	gen_sha1_data2(&ops, num_flows, flowLengths);
+	sha1_prepare(&ops, &param, pool);
+
+	sha_ctx.sha1((void*)param.memory_start,
 			  param.in_pos,
 			  param.key_pos,
 			  param.pkt_offset_pos,
@@ -209,14 +264,60 @@ static bool test_correctness_hmac_sha1(unsigned  num_flows, unsigned flow_len)
 
 	sha_ctx.sync(0);
 
-	hmac_sha1_post(&ops, &param);
+	sha1_post(&ops, &param);
 
 	delete pool;
 
-	return verify_hmac_sha1(&ops);
+	return verify_sha1(&ops);
 }
 
-static void test_latency_hmac_sha1(unsigned num_flows, unsigned flow_len)
+void calculate_sha1(unsigned char **m, unsigned int *flow_len,unsigned char **digest,unsigned int num_flows)
+{
+	device_context dev_ctx;
+	dev_ctx.init(num_flows * 512 * 2.2, 0);
+	sha_context sha_ctx(&dev_ctx);
+
+	pinned_mem_pool *pool;
+	pool = new pinned_mem_pool();
+	pool->init(num_flows *  512 * 2.2);
+
+	operation_batch_t ops;
+	sha1_param_t param;
+
+	unsigned int flowLengths[num_flows];
+	for(unsigned int i=0;i<num_flows;i++)
+	{
+		flowLengths[i] = 512; //(rand() % 512) + 1;
+	}
+
+	gen_sha1_data2(&ops, num_flows, flowLengths);
+	sha1_prepare(&ops, &param, pool);
+
+	sha_ctx.sha1((void*)param.memory_start,
+			  param.in_pos,
+			  param.key_pos,
+			  param.pkt_offset_pos,
+			  param.length_pos,
+			  param.total_size,
+			  param.out,
+			  param.num_flows,
+			  0);
+
+	sha_ctx.sync(0);
+	sha1_post(&ops, &param);
+
+	delete pool;
+
+	int count=0;
+	for (operation_batch_t::iterator i = ops->begin();
+		  i != ops->end(); i++) {
+		memcpy(digest[count] ,(*i).out, SHA1_HASH_SIZE);
+		count++;
+	}
+}
+
+
+static void test_latency_sha1(unsigned num_flows, unsigned flow_len)
 {
 	device_context dev_ctx;
 	dev_ctx.init(num_flows * max(flow_len, 512) * 2.2, 0);
@@ -227,12 +328,24 @@ static void test_latency_hmac_sha1(unsigned num_flows, unsigned flow_len)
 	pool->init(num_flows * max(flow_len, 512) * 2.2);
 
 	operation_batch_t ops;
-	hmac_sha1_param_t param;
+	sha1_param_t param;
 
-	gen_hmac_sha1_data(&ops, num_flows, flow_len);
-	hmac_sha1_prepare(&ops, &param, pool);
+	unsigned int flowLengths[num_flows];
 
-	sha_ctx.hmac_sha1((void*)param.memory_start,
+	cout<<endl;
+
+	for(unsigned int i=0;i<num_flows;i++)
+	{
+		flowLengths[i] = 512; //(rand() % 512) + 1;
+		//cout<<flowLengths[i]<<endl;
+	}
+
+	cout<<endl;
+
+	gen_sha1_data2(&ops, num_flows, flowLengths);
+	sha1_prepare(&ops, &param, pool);
+
+	sha_ctx.sha1((void*)param.memory_start,
 			  param.in_pos,
 			  param.key_pos,
 			  param.pkt_offset_pos,
@@ -244,12 +357,12 @@ static void test_latency_hmac_sha1(unsigned num_flows, unsigned flow_len)
 
 	sha_ctx.sync(0);
 
-	hmac_sha1_post(&ops, &param);
+	sha1_post(&ops, &param);
 
-	unsigned rounds = 100;
+	unsigned rounds = 10;
 	uint64_t begin_usec = get_usec();
 	for (unsigned i = 0; i < rounds; i++) {
-		sha_ctx.hmac_sha1((void*)param.memory_start,
+		sha_ctx.sha1((void*)param.memory_start,
 				  param.in_pos,
 				  param.key_pos,
 				  param.pkt_offset_pos,
@@ -258,6 +371,15 @@ static void test_latency_hmac_sha1(unsigned num_flows, unsigned flow_len)
 				  param.out,
 				  param.num_flows,
 				  0);
+
+	/*	for ( int g = 0; g < num_flows; g++) {
+			printf("The hash for message %d is: ",g);
+			for(int f=0;f<20;f++)
+			{
+				printf("%x",*(param.out+(g*20)+f));
+			}
+			cout<<endl;
+		}*/
 
 		sha_ctx.sync(0);
 	}
@@ -271,7 +393,7 @@ static void test_latency_hmac_sha1(unsigned num_flows, unsigned flow_len)
 	       num_flows, avg/1000, num_flows * flow_len * 8 / avg);
 }
 
-static void test_latency_stream_hmac_sha1(unsigned num_flows,
+static void test_latency_stream_sha1(unsigned num_flows,
 					  unsigned flow_len,
 					  unsigned num_stream)
 {
@@ -284,13 +406,13 @@ static void test_latency_stream_hmac_sha1(unsigned num_flows,
 	pool->init(num_flows * max(flow_len, 512) * 2 * num_stream);
 
 	operation_batch_t ops[MAX_STREAM + 1];
-	hmac_sha1_param_t param[MAX_STREAM + 1];
+	sha1_param_t param[MAX_STREAM + 1];
 
 	//warmup
 	for (unsigned i = 1; i <= num_stream; i++) {
-		gen_hmac_sha1_data(&ops[i], num_flows, flow_len);
-		hmac_sha1_prepare(&ops[i], &param[i], pool);
-		sha_ctx.hmac_sha1((void*)param[i].memory_start,
+		gen_sha1_data(&ops[i], num_flows, flow_len);
+		sha1_prepare(&ops[i], &param[i], pool);
+		sha_ctx.sha1((void*)param[i].memory_start,
 				  param[i].in_pos,
 				  param[i].key_pos,
 				  param[i].pkt_offset_pos,
@@ -320,7 +442,7 @@ static void test_latency_stream_hmac_sha1(unsigned num_flows,
 			}
 		}
 		if (stream != 0) {
-			sha_ctx.hmac_sha1((void*)param[stream].memory_start,
+			sha_ctx.sha1((void*)param[stream].memory_start,
 					  param[stream].in_pos,
 					  param[stream].key_pos,
 					  param[stream].pkt_offset_pos,
@@ -348,19 +470,23 @@ static void test_latency_stream_hmac_sha1(unsigned num_flows,
 	       num_flows * flow_len * 8 / avg);
 }
 
-void test_hmac_sha1(int size)
+void test_sha1(int size)
 {
+
+
 	printf("------------------------------------------\n");
-	printf("HMAC_SHA1 GPU, Size: %dKB\n", size / 1024);
+	printf("SHA1 GPU, Size: %dKB\n", size / 1024);
 	printf("------------------------------------------\n");
 	printf("#msg latency(ms) thruput(Mbps)\n");
 	for (unsigned i = 1 ; i <= 4096 ;i = i * 2)
-		test_latency_hmac_sha1(i, size);
+	{
+		test_latency_sha1(i, size);
+	}
 
 	printf("Correctness check (batch, random): ");
 	bool result = true;
 	for (unsigned i = 1 ; i <= 4096 ;i = i * 2)
-		result = result && test_correctness_hmac_sha1(i, size);
+		result = result && test_correctness_sha1(i, size);
 
 	if (!result)
 		printf("FAIL\n");
@@ -369,14 +495,14 @@ void test_hmac_sha1(int size)
 
 }
 
-void test_hmac_sha1_stream(int size, int num_stream)
+void test_sha1_stream(int size, int num_stream)
 {
 	printf("------------------------------------------\n");
-	printf("HMAC_SHA1, Size: %dKB\n", size / 1024);
+	printf("SHA1, Size: %dKB\n", size / 1024);
 	printf("------------------------------------------\n");
 	printf("#msg #stream latency(ms) thruput(Mbps)\n");
 	for (unsigned i = 1 ; i <= 4096 ;i = i * 2)
-		test_latency_stream_hmac_sha1(i, size, num_stream);
+		test_latency_stream_sha1(i, size, num_stream);
 }
 
 
@@ -413,9 +539,9 @@ int main(int argc, char *argv[])
 	}
 
 	if (num_stream == 0)
-		test_hmac_sha1(size);
+		test_sha1(size);
 	else
-		test_hmac_sha1_stream(size, num_stream);
+		test_sha1_stream(size, num_stream);
 
 	return 0;
 

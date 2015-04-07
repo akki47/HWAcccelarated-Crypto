@@ -65,7 +65,7 @@ objs/rsa_context.o: rsa_context.cc rsa_context.hh
 rsa_context.hh:
 objs/rsa_context_mp.o: rsa_context_mp.cc rsa_context_mp.hh rsa_context.hh \
  mp_modexp.h device_context.hh pinned_mem_pool.hh memory_pool.hh \
- cuda_mem_pool.hh
+ cuda_mem_pool.hh sha_context.hh
 
 rsa_context_mp.hh:
 
@@ -80,6 +80,8 @@ pinned_mem_pool.hh:
 memory_pool.hh:
 
 cuda_mem_pool.hh:
+
+sha_context.hh:
 objs/rsa_context_rns.o: rsa_context_rns.cc rsa_context_rns.hh rsa_context.hh \
  rsa_cuda.h bn_kn.h
 

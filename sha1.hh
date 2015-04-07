@@ -12,5 +12,8 @@ void hmac_sha1_gpu(char* buf, char* keys,  uint32_t *offsets, uint16_t *lengths,
 		   uint32_t *outputs, int N, uint8_t * checkbits,
 		   unsigned threads_per_blk, cudaStream_t stream=0);
 
+void sha1_gpu(char* buf, char* keys,  uint32_t *offsets, uint16_t *lengths,
+		   uint32_t *outputs, int N, uint8_t * checkbits,
+		   unsigned threads_per_blk, cudaStream_t stream=0);
 
 #endif/*__SHA1_KERNEL*/

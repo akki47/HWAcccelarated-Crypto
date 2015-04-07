@@ -12,8 +12,8 @@ endif
 OPENSSL_LIB = -lcrypto
 
 #generic config
-CC = gcc
-CFLAGS = -O0 -g -Wall
+CC = g++
+CFLAGS = -O3 -Wall
 INC = $(OPENSSL_INCDIR)
 
 #CUDA related config 
@@ -30,7 +30,7 @@ CUDA_LIBS =  -lcuda -lcudart
 #you can manually set IS_FERMI value below if it does not automatically detect your fermi device.
 #read FERMI_DEVICES file for supported cards list.
 CUDA_DEVICE_IDS = $(shell cat $(GPUCRYPTO_DIR)FERMI_DEVICES | sed "s/^.*0x//g" | awk '{print "10de:"$$1}')
-IS_FERMI = $(foreach DEVID, $(CUDA_DEVICE_IDS), $(shell lspci -nn | grep -q $(DEVID) && echo "1"))
+IS_FERMI = 1 #$(foreach DEVID, $(CUDA_DEVICE_IDS), $(shell lspci -nn | grep -q $(DEVID) && echo "1"))
 
 ifneq (,$(findstring 1,$(IS_FERMI)))
 	NVCFLAGS += -DMP_USE_64BIT=1 -gencode arch=compute_20,code=sm_20

@@ -363,7 +363,7 @@ void AES_cbc_128_encrypt_gpu(const uint8_t      *in_d,
 		AES_cbc_128_hash_kernel_SharedMem<<<num_cuda_blks, threads_per_blk>>>(
 		    in_d, out_d, pkt_offset_d, keys_d, ivs_d, num_flows, checkbits_d);
 	} else {
-		AES_cbc_128_encrypt_kernel_SharedMem<<<num_cuda_blks, threads_per_blk, 0, stream>>>(
+		AES_cbc_128_hash_kernel_SharedMem<<<num_cuda_blks, threads_per_blk, 0, stream>>>(
 		    in_d, out_d, pkt_offset_d, keys_d, ivs_d, num_flows, checkbits_d);
 	}
 }
