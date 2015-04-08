@@ -39,13 +39,11 @@ rsa_context_mp::~rsa_context_mp()
 	BN_free(out_bn_q);
 
 	checkCudaErrors(cudaFree(sw_d));
+	checkCudaErrors(cudaFree(swe_d));
 
 	checkCudaErrors(cudaFree(n_d));
 	checkCudaErrors(cudaFree(np_d));
-	checkCudaErrors(cudaFree(ns_d));
-	checkCudaErrors(cudaFree(nps_d));
 	checkCudaErrors(cudaFree(r_sqr_d));
-	checkCudaErrors(cudaFree(rs_sqr_d));
 
 	checkCudaErrors(cudaFree(iqmp_d));
 
@@ -142,7 +140,7 @@ void rsa_context_mp::priv_decrypt_stream(unsigned char **out,unsigned int *out_l
 	streams[stream_id].out_len = out_len;
 }
 
-void rsa_context_mp::RA_sign_online_stream(const unsigned char **sigbuf, const unsigned int *siglen,
+void rsa_context_mp::RA_modmult_stream(const unsigned char **sigbuf, const unsigned int *siglen,
 		unsigned char **condensed_sig, unsigned int *condensed_siglen, int n, int stream_id, int a)
 {
 	assert(is_crt_available());
@@ -188,6 +186,7 @@ void rsa_context_mp::RA_sign_online_stream(const unsigned char **sigbuf, const u
 			r_sqr_d,
 		      dev_ctx_->get_stream(stream_id),
 		      stream_id,
+		      a,
 		      dev_ctx_->get_dev_checkbits(stream_id));
 
 
@@ -252,7 +251,7 @@ void rsa_context_mp::RA_sign_online(const unsigned char **sigbuf, const unsigned
 		condensedSignature_arr[i] = condensed_sig[i];
 	}
 
-	RA_sign_online_stream(sigbuf, siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, a);
+	RA_modmult_stream(sigbuf, siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, a);
 	sync(0, a);
 }
 
@@ -260,53 +259,64 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 		const unsigned char **condensed_sig, int n, int a)
 {
 	int success = 0;
-	int signatureLength = get_key_bits() / 8;
+	unsigned int signatureLength = get_key_bits() / 8;
 
 	unsigned char digest[n][SHA_DIGEST_LENGTH];
 	unsigned char digestPadded[n][signatureLength];
 	unsigned char multipliedDigest[n][signatureLength];
+	unsigned char returned_condensed_sigs[n - a][signatureLength];
 
 	unsigned char *digest_arr[n];
+	const unsigned char *condensed_sig_arr[n - a];
+	unsigned char *returned_condensed_sig_arr[n];
 	unsigned char *multipliedDigest_arr[n];
 
 	unsigned int digestLength[n];
 	unsigned int multipliedHashLength[n];
+	unsigned int returned_condensed_sigLength[n];
 
-	for(int i = 0;i < n; i++)
-	{
-		digest_arr[i] = digest[i];
-		multipliedDigest_arr[i] = multipliedDigest[i];
-	}
+//	for(int i = 0;i < n; i++)
+//	{
+//		digest_arr[i] = digest[i];
+//		multipliedDigest_arr[i] = multipliedDigest[i];
+//	}
 
-	//Calculate SHA Hashes in GPU
-	device_context dev_ctx;
-	dev_ctx.init(n * 512 * 2.2, 0);
-	sha_context sha_ctx(&dev_ctx);
-	sha_ctx.calculate_sha1(m, m_len, digest_arr, n);
+//	//Calculate SHA Hashes in GPU
+//	device_context dev_ctx;
+//	dev_ctx.init(n * 512 * 2.2, 0);
+//	sha_context sha_ctx(&dev_ctx);
+//	sha_ctx.calculate_sha1(m, m_len, digest_arr, n);
 
 	for(int i = 0; i < n; i++)
 	{
 		digestLength[i] = signatureLength;
 		digest_arr[i] = digestPadded[i];
+		multipliedDigest_arr[i] = multipliedDigest[i];
+		CalculateMessageDigest(m[i], m_len[i], digest[i], SHA_DIGEST_LENGTH);
 
 		//Pad the hashed message
 		memset(digestPadded[i], 0, signatureLength - 20);
 		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
 	}
 
-	RA_sign_online_stream((const unsigned char **)digest_arr, (const unsigned int *)digestLength, multipliedDigest_arr, multipliedHashLength, n , 0, a);
+	RA_modmult_stream((const unsigned char **)digest_arr, (const unsigned int *)digestLength, multipliedDigest_arr, multipliedHashLength, n , 0, a);
 	sync(0, a);
 
 	BIGNUM *digest_bn = BN_new();
 	BIGNUM *condensedSignature_bn = BN_new();
 
+	for(int i = 0; i < n - a; i++)
+	{
+		condensed_sig_arr[i] = condensed_sig[i];
+		returned_condensed_sig_arr[i] = returned_condensed_sigs[i];
+	}
+
+	RA_verify_stream((const unsigned char **)condensed_sig_arr, (const unsigned int *)digestLength, returned_condensed_sig_arr, returned_condensed_sigLength, n - a, 0);
+	sync(0);
+
 	for(int i = 0;i < n - a ; i++)
 	{
-		BN_one(digest_bn);
-		BN_zero(condensedSignature_bn);
-
-		BN_bin2bn(condensed_sig[i], signatureLength, condensedSignature_bn);
-		BN_mod_exp(condensedSignature_bn, condensedSignature_bn, rsa->e, rsa->n, bn_ctx);
+		BN_bin2bn(returned_condensed_sigs[i], signatureLength, condensedSignature_bn);
 		BN_bin2bn(multipliedDigest[i], multipliedHashLength[i], digest_bn);
 
 		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
@@ -339,7 +349,7 @@ void rsa_context_mp::RA_sign_offline_stream(const unsigned char **m, const unsig
 		assert(in_bn_p != NULL);
 		assert(in_bn_q != NULL);
 
-		//assert(BN_cmp(in_bn_p, rsa->n) < 0);
+		assert(BN_cmp(in_bn_p, rsa->n) < 0);
 
 		BN_nnmod(in_bn_p, in_bn_p, rsa->p, bn_ctx);	// TODO: test BN_nnmod
 		BN_nnmod(in_bn_q, in_bn_q, rsa->q, bn_ctx);
@@ -366,6 +376,58 @@ void rsa_context_mp::RA_sign_offline_stream(const unsigned char **m, const unsig
 	streams[stream_id].out = sigret;
 	streams[stream_id].out_len = siglen;
 }
+
+void rsa_context_mp::RA_verify_stream(const unsigned char **m, const unsigned int *m_len,
+		unsigned char **sigret, unsigned int *siglen, int n, unsigned int stream_id)
+{
+	assert(is_crt_available());
+	assert(0 < n && n <= max_batch);
+	assert(n <= MP_MAX_NUM_PAIRS);
+	assert(stream_id <= max_stream);
+	assert(dev_ctx_ != NULL);
+	assert(dev_ctx_->get_state(stream_id) == READY);
+	dev_ctx_->set_state(stream_id, WAIT_KERNEL);
+
+	int word_len = (get_key_bits() / 2) / BITS_PER_WORD;
+	int S = word_len;
+	int num_blks = ((n + MP_MSGS_PER_BLOCK - 1) / MP_MSGS_PER_BLOCK) * 2;
+	dev_ctx_->clear_checkbits(stream_id, num_blks);
+	streams[stream_id].post_launched = false;
+
+	for (int i = 0; i < n; i++) {
+		BN_bin2bn(m[i], m_len[i], in_bn_p);
+		BN_bin2bn(m[i], m_len[i], in_bn_q);
+		assert(in_bn_p != NULL);
+		assert(in_bn_q != NULL);
+
+		assert(BN_cmp(in_bn_p, rsa->n) < 0);
+
+		BN_nnmod(in_bn_p, in_bn_p, rsa->p, bn_ctx);	// TODO: test BN_nnmod
+		BN_nnmod(in_bn_q, in_bn_q, rsa->q, bn_ctx);
+
+		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S), in_bn_p, word_len);
+		mp_bn2mp(streams[stream_id].a + (i * 2 * MAX_S) + MAX_S, in_bn_q, word_len);
+	}
+
+
+	//copy in put and execute kernel
+	mp_modexp_crt(streams[stream_id].a,
+			n, word_len,
+			streams[stream_id].ret_d, streams[stream_id].a_d,
+			swe_d,
+			n_d,
+			np_d,
+			r_sqr_d,
+		      dev_ctx_->get_stream(stream_id),
+		      stream_id,
+		      dev_ctx_->get_dev_checkbits(stream_id));
+
+
+	streams[stream_id].n = n;
+	streams[stream_id].out = sigret;
+	streams[stream_id].out_len = siglen;
+}
+
 
 bool rsa_context_mp::sync(unsigned int stream_id, int a, bool block, bool copy_result)
 {
@@ -418,7 +480,7 @@ bool rsa_context_mp::sync(unsigned int stream_id, int a, bool block, bool copy_r
 		}
 
 		//move result to out from gathred buffer
-		for (int i = 0; i < streams[stream_id].n ; i++) {
+		for (int i = 0; i < streams[stream_id].n - a ; i++) {
 			int rsa_bytes = get_key_bits() / 8;
 
 			memcpy(streams[stream_id].out[i], (unsigned char *)(streams[stream_id].ret + (i * 2 * MAX_S)), rsa_bytes);
@@ -501,14 +563,36 @@ void rsa_context_mp::gpu_setup()
 	{
 		struct mp_sw sw[2];
 
-		mp_bn2mp(mp_e[0], rsa->dmp1, word_len);
-		mp_bn2mp(mp_e[1], rsa->dmq1, word_len);
+		mp_bn2mp(mp_d[0], rsa->dmp1, word_len);
+		mp_bn2mp(mp_d[1], rsa->dmq1, word_len);
+
+		mp_get_sw(&sw[0], mp_d[0], word_len);
+		mp_get_sw(&sw[1], mp_d[1], word_len);
+
+		checkCudaErrors(cudaMalloc(&sw_d, sizeof(struct mp_sw) * 2));
+		checkCudaErrors(cudaMemcpy(sw_d, sw, sizeof(struct mp_sw) * 2, cudaMemcpyHostToDevice));
+	}
+
+	{
+		struct mp_sw sw[2];
+
+		BIGNUM *emp1 = BN_new();
+		BIGNUM *emq1 = BN_new();
+
+		BN_mod_sub(emp1, rsa->p, BN_value_one(), rsa->n, bn_ctx);
+		BN_mod_sub(emq1, rsa->q, BN_value_one(), rsa->n, bn_ctx);
+
+		BN_nnmod(emp1, rsa->e, emp1, bn_ctx);
+		BN_nnmod(emq1, rsa->e, emq1, bn_ctx);
+
+		mp_bn2mp(mp_e[0], emp1, word_len);
+		mp_bn2mp(mp_e[1], emq1, word_len);
 
 		mp_get_sw(&sw[0], mp_e[0], word_len);
 		mp_get_sw(&sw[1], mp_e[1], word_len);
 
-		checkCudaErrors(cudaMalloc(&sw_d, sizeof(struct mp_sw) * 2));
-		checkCudaErrors(cudaMemcpy(sw_d, sw, sizeof(struct mp_sw) * 2, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMalloc(&swe_d, sizeof(struct mp_sw) * 2));
+		checkCudaErrors(cudaMemcpy(swe_d, sw, sizeof(struct mp_sw) * 2, cudaMemcpyHostToDevice));
 	}
 
 	{

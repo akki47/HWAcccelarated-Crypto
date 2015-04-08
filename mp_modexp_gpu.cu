@@ -161,6 +161,7 @@ __global__ void mp_modmult_kernel(int num_pairs,
 				 const struct mp_sw *_sw,
 				 const WORD *N, const WORD *NP, const WORD *R_SQR,
 				 unsigned int stream_id,
+				 unsigned int numberOfComponents,
 				 uint8_t *checkbits = 0)
 {
 	__shared__ WORD n[S];
@@ -175,7 +176,7 @@ __global__ void mp_modmult_kernel(int num_pairs,
 	const int pair_idx = blockIdx.x % 2;
 	const int idx = threadIdx.x % S;
 
-	if (msg_idx + 7 >= num_pairs)
+	if (msg_idx + numberOfComponents > num_pairs)
 		return;
 
 	WORD *ret = _ret + limb_idx * S;
@@ -186,17 +187,15 @@ __global__ void mp_modmult_kernel(int num_pairs,
 	np = NP[pair_idx * MAX_S + 0];
 	ret[idx] = R_SQR[pair_idx * MAX_S + idx];
 
-	tmp[idx] = A[msg_idx * (2 * MAX_S) + pair_idx * MAX_S + idx];
+	tmp[idx] = A[msg_idx * (2 * MAX_S) + pair_idx * MAX_S + idx];//tmp = m[0]
 	mp_montmul_dev<S>(tmp, tmp, ret, n, np, limb_idx, idx);
 
-
-	for(int x=1;x<=7;x++)
+	for(int x = 1;x < numberOfComponents; x++)
 	{
-	tmp2[idx] = A[(msg_idx + x) * (2 * MAX_S) + pair_idx * MAX_S + idx]; //(m_x)
-	mp_montmul_dev<S>(tmp2, tmp2, ret, n, np, limb_idx, idx); //m_xr
-	//tmp = ar
+		tmp2[idx] = A[(msg_idx + x) * (2 * MAX_S) + pair_idx * MAX_S + idx]; //tmp2 = m[x]
+		mp_montmul_dev<S>(tmp2, tmp2, ret, n, np, limb_idx, idx); //tmp2 = m[x]*r
 
-	mp_montmul_dev<S>(tmp, tmp2, tmp, n, np, limb_idx, idx); // tmp = ar*m_xr
+		mp_montmul_dev<S>(tmp, tmp2, tmp, n, np, limb_idx, idx); // tmp =  (m[x]*m[0]) * r
 	}
 
 
@@ -544,6 +543,7 @@ void mp_modmult_crt(WORD *a,
 		   WORD *n_d, WORD *np_d, WORD *r_sqr_d,
 		   cudaStream_t stream,
 		   unsigned int stream_id,
+		   unsigned int numberOfComponents,
 		   uint8_t *checkbits
 )
 {
@@ -580,6 +580,7 @@ void mp_modmult_crt(WORD *a,
 				(WORD *)np_d,
 				(WORD *)r_sqr_d,
 				stream_id,
+				numberOfComponents,
 				checkbits);
 		break;
 	case S_512:
@@ -591,6 +592,7 @@ void mp_modmult_crt(WORD *a,
 				(WORD *)np_d,
 				(WORD *)r_sqr_d,
 				stream_id,
+				numberOfComponents,
 				checkbits);
 		break;
 	case S_1024:
@@ -602,6 +604,7 @@ void mp_modmult_crt(WORD *a,
 				(WORD *)np_d,
 				(WORD *)r_sqr_d,
 				stream_id,
+				numberOfComponents,
 				checkbits);
 		break;
 	case S_2048:
@@ -613,6 +616,7 @@ void mp_modmult_crt(WORD *a,
 				(WORD *)np_d,
 				(WORD *)r_sqr_d,
 				stream_id,
+				numberOfComponents,
 				checkbits);
 		break;
 	default:

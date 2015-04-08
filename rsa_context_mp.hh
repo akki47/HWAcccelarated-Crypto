@@ -128,7 +128,7 @@ public:
 				unsigned char **condensed_sig, int n, int a);
 
 
-	virtual void RA_sign_online_stream(const unsigned char **sigbuf, const unsigned int *siglen,
+	virtual void RA_modmult_stream(const unsigned char **sigbuf, const unsigned int *siglen,
 			unsigned char **condensed_sig, unsigned int *condensed_siglen, int n, int stream_id, int a);
 	/**
 	 *  Verify the condensed signature.
@@ -141,6 +141,8 @@ public:
 	virtual int RA_verify(const unsigned char **m, const unsigned int *m_len,
     			const unsigned char **condensed_sig, int n, int a);
 
+	void RA_verify_stream(const unsigned char **m, const unsigned int *m_len,
+			unsigned char **sigret, unsigned int *siglen, int n, unsigned int stream_id);
 	/**
 	 *  Verify the condensed signature.
 	 *
@@ -209,6 +211,9 @@ private:
 	} streams[max_stream + 1];
 
 	struct mp_sw *sw_d;
+	struct mp_sw *swe_d;
+
+
 	WORD *n_d;
 	WORD *ns_d;
 
@@ -221,6 +226,7 @@ private:
 	WORD *iqmp_d;
 
 	WORD mp_e[2][MAX_S];
+	WORD mp_d[2][MAX_S];
 	WORD mp_n[2][MAX_S];
 	WORD mp_ns[MAX_S];
 	WORD mp_np[2][MAX_S];

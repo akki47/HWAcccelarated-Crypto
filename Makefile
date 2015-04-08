@@ -113,13 +113,13 @@ $(OBJS_DIR):
 	mkdir $(OBJS_DIR)
 
 $(DEPS): $(SRC_FILES) $(HEADER_FILES)
-	$(CC) -pg -MM -MP -x c++ $(CU_SRC_FILES) $(CC_SRC_FILES) | sed 's![^:]*.o:!objs/&!g' > Makefile.dep
+	$(CC) -MM -MP -x c++ $(CU_SRC_FILES) $(CC_SRC_FILES) | sed 's![^:]*.o:!objs/&!g' > Makefile.dep
 
 $(OBJS_DIR)/%.o : %.cc
-	$(GCC) -g -pg -DMP_USE_64BIT=1 $(CCFLAGS) $(NVCCINCLUDES) -c $< -o $@
+	$(GCC) -g -DMP_USE_64BIT=1 $(CCFLAGS) $(NVCCINCLUDES) -c $< -o $@
 
 $(OBJS_DIR)/%.o : %.cu
-	$(NVCC) -G -g -pg -DMP_USE_64BIT=1 $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
+	$(NVCC) -G -g -DMP_USE_64BIT=1 $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
 
 .PHONY : clean
 

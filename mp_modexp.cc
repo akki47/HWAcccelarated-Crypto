@@ -46,7 +46,8 @@ void mp_bn2mp(WORD *a, const BIGNUM *bn, int word_len)
 	assert(word_len * (int)sizeof(WORD) >= BN_num_bytes(bn));
 
 	if (sizeof(WORD) == sizeof(BN_ULONG)) {
-		memcpy(a, bn->d, word_len * sizeof(WORD));
+		memset(a, 0, sizeof(WORD) * word_len);
+		memcpy(a, bn->d, bn->top * sizeof(WORD));
 	} else {
 		memset(a, 0, sizeof(WORD) * word_len);
 		BN_bn2bin(bn, (unsigned char *)a + (word_len * sizeof(WORD) - BN_num_bytes(bn)));
