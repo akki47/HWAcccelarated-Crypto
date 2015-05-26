@@ -13,7 +13,8 @@ rsa_context::rsa_context(int keylen)
 	assert(keylen == 512 || keylen == 1024 || keylen == 2048 || keylen == 4096);
 
 	BIGNUM *e = BN_new();
-	BN_set_word(e, RSA_F4 /* 65537 */);
+	//BN_set_word(e, RSA_F4 /* 65537 */);
+	BN_set_word(e, RSA_3 /* 3 */);
 
 	rsa = RSA_new();
 	RSA_generate_key_ex(rsa, keylen, e, NULL);

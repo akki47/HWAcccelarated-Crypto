@@ -23,7 +23,7 @@ typedef uint64_t WORD;
 #define S_1024	16
 #define S_2048	32
 
-#define MP_MSGS_PER_BLOCK (16 / (S / S_256))
+#define MP_MSGS_PER_BLOCK (32 / (S / S_256))
 #define THREADS_PER_BLK 8
 
 #elif MP_USE_64BIT == 0

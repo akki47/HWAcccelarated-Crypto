@@ -43,19 +43,19 @@ template<int S>
 __device__ void mp_montmul_dev(WORD *ret, const WORD *ar, const WORD *br,
 			       const WORD *n, WORD np, int limb_idx, int idx)
 {
-#if __CUDA_ARCH__ >= 200 && MP_USE_64BIT
-	__shared__ WORD _t[S * 3 * MP_MSGS_PER_BLOCK];
-	__shared__ uint32_t _c[S * 3 * MP_MSGS_PER_BLOCK];
-
-	volatile WORD *t = _t + (S * 3 * limb_idx);
-	volatile uint32_t *c = _c + (S * 3 * limb_idx);
-#else
+//#if __CUDA_ARCH__ >= 200 && MP_USE_64BIT
+//	__shared__ WORD _t[S * 3 * MP_MSGS_PER_BLOCK];
+//	__shared__ uint32_t _c[S * 3 * MP_MSGS_PER_BLOCK];
+//
+//	volatile WORD *t = _t + (S * 3 * limb_idx);
+//	volatile uint32_t *c = _c + (S * 3 * limb_idx);
+//#else
 	__shared__ WORD _t[S * 2 * MP_MSGS_PER_BLOCK];
 	__shared__ uint32_t _c[S * 2 * MP_MSGS_PER_BLOCK];
 
 	volatile WORD *t = _t + (S * 2 * limb_idx);
 	volatile uint32_t *c = _c + (S * 2 * limb_idx);
-#endif
+//#endif
 
 	c[idx] = 0;
 	c[idx + S] = 0;
@@ -154,6 +154,9 @@ n_is_bigger:
 
 __device__ WORD ar_pow[MAX_STREAMS + 1][MP_SW_MAX_FRAGMENT / 2][2][MP_MAX_NUM_PAIRS][MAX_S];
 
+__device__ WORD _ret[MP_MAX_NUM_PAIRS][32 * S_256];
+__device__ WORD _tmp[MP_MAX_NUM_PAIRS][32 * S_256];
+__device__ WORD _tmp2[MP_MAX_NUM_PAIRS][32 * S_256];
 
 template<int S>
 __global__ void mp_modmult_kernel(int num_pairs,
@@ -165,9 +168,9 @@ __global__ void mp_modmult_kernel(int num_pairs,
 				 uint8_t *checkbits = 0)
 {
 	__shared__ WORD n[S];
-	__shared__ WORD _ret[S * MP_MSGS_PER_BLOCK];
-	__shared__ WORD _tmp[S * MP_MSGS_PER_BLOCK];
-	__shared__ WORD _tmp2[S * MP_MSGS_PER_BLOCK];
+//	__shared__ WORD _ret[S * MP_MSGS_PER_BLOCK];
+//	__shared__ WORD _tmp[S * MP_MSGS_PER_BLOCK];
+//	__shared__ WORD _tmp2[S * MP_MSGS_PER_BLOCK];
 
 	WORD np;
 
@@ -179,9 +182,9 @@ __global__ void mp_modmult_kernel(int num_pairs,
 	if (msg_idx + numberOfComponents > num_pairs)
 		return;
 
-	WORD *ret = _ret + limb_idx * S;
-	WORD *tmp = _tmp + limb_idx * S;
-	WORD *tmp2 = _tmp2 + limb_idx * S;
+	WORD *ret = _ret[blockIdx.x] + limb_idx * S;
+	WORD *tmp = _tmp[blockIdx.x] + limb_idx * S;
+	WORD *tmp2 = _tmp2[blockIdx.x] + limb_idx * S;
 
 	n[idx] = N[pair_idx * MAX_S + idx];
 	np = NP[pair_idx * MAX_S + 0];
@@ -228,8 +231,8 @@ __global__ void mp_modexp_kernel(int num_pairs,
 )
 {
 	__shared__ WORD n[S];
-	__shared__ WORD _ret[S * MP_MSGS_PER_BLOCK];
-	__shared__ WORD _tmp[S * MP_MSGS_PER_BLOCK];
+	//__shared__ WORD _ret[S * MP_MSGS_PER_BLOCK];
+	//__shared__ WORD _tmp[S * MP_MSGS_PER_BLOCK];
 
 	WORD np;
 
@@ -241,8 +244,8 @@ __global__ void mp_modexp_kernel(int num_pairs,
 	if (msg_idx >= num_pairs)
 		return;
 
-	WORD *ret = _ret + limb_idx * S;
-	WORD *tmp = _tmp + limb_idx * S;
+	WORD *ret = _ret[blockIdx.x] + limb_idx * S;
+	WORD *tmp = _tmp[blockIdx.x] + limb_idx * S;
 
 	const struct mp_sw *sw = &_sw[pair_idx];
 	int num_frags = sw->num_fragments;

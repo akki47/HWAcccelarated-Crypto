@@ -391,7 +391,7 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 
     printf("# msg	lSOff(ms)	lSOn(us)	lVerify(us)	tSOff(RSA sigs/s)	tSOn(RA csigs/s)	tVerify(RA csigs/s)\n");
 
-    for (int k = 32; k <= rsa_context::max_batch; k *= 2)
+    for (int k = 64; k <= rsa_context::max_batch; k *= 2)
     {
         unsigned char *ptext_arr[rsa_context::max_batch];
         unsigned char *ctext_arr[rsa_context::max_batch];
@@ -437,7 +437,7 @@ try_moreSign:
 				(unsigned char **)condensedSignature_arr, k, numberOfComponents);
 
 		endSignOnline = get_usec();
-        if (endSignOnline - beginSignOnline < 300000)
+        if (iterationSign < 25)
         {
         	iterationSign++;
 
@@ -461,7 +461,7 @@ try_moreVerify:
 				(const unsigned char**)condensedSignature_arr, k, numberOfComponents);
 
 		endVerify = get_usec();
-		if (endVerify - beginVerify < 300000)
+		if (iterationVerify < 25)
 		{
 			iterationVerify++;
 
@@ -623,7 +623,7 @@ try_moreVerify:
 
 void sign_test_rsa_cpu()
 {
-	int numberOfComponents = 16;
+	int numberOfComponents = 32;
     printf("------------------------------------------\n");
     printf("RSA512, SIGNATURE, CPU, random, NumberOfComponents=%d\n", numberOfComponents);
     printf("------------------------------------------\n");
@@ -679,7 +679,7 @@ void sign_test_rsa_cpu()
 
 void sign_test_rsa_mp()
 {
-	int numberOfComponents = 16;
+	int numberOfComponents = 32;
     device_context dev_ctx;
     dev_ctx.init(10485760, 0);
 
@@ -707,13 +707,13 @@ void sign_test_rsa_mp()
     sign_test_latency(&rsa2048_mp, 2048, numberOfComponents);
     //sign_test_correctness(&rsa2048_mp, 2048,  20);
 
-    printf("------------------------------------------\n");
-    printf("RSA4096, SIGNATURE, GPU (MP), random, NumberOfComponents=%d\n", numberOfComponents);
-    printf("------------------------------------------\n");
-    rsa_context_mp rsa4096_mp(4096);
-    rsa4096_mp.set_device_context(&dev_ctx);
-    sign_test_latency(&rsa4096_mp, 4096, numberOfComponents);
-    //sign_test_correctness(&rsa4096_mp, 4096, 20);
+//    printf("------------------------------------------\n");
+//    printf("RSA4096, SIGNATURE, GPU (MP), random, NumberOfComponents=%d\n", numberOfComponents);
+//    printf("------------------------------------------\n");
+//    rsa_context_mp rsa4096_mp(4096);
+//    rsa4096_mp.set_device_context(&dev_ctx);
+//    sign_test_latency(&rsa4096_mp, 4096, numberOfComponents);
+//    //sign_test_correctness(&rsa4096_mp, 4096, 20);
 }
 
 //void test_rsa_mp_cert(unsigned num_stream)

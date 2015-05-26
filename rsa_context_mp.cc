@@ -8,6 +8,9 @@
 #include "rsa_context_mp.hh"
 #include "sha_context.hh"
 
+unsigned char multipliedDigest[rsa_context::max_batch][512];
+unsigned char returned_condensed_sigs[rsa_context::max_batch][512];
+
 rsa_context_mp::rsa_context_mp(int keylen)
 	: rsa_context(keylen)
 {
@@ -263,8 +266,6 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 
 	unsigned char digest[n][SHA_DIGEST_LENGTH];
 	unsigned char digestPadded[n][signatureLength];
-	unsigned char multipliedDigest[n][signatureLength];
-	unsigned char returned_condensed_sigs[n - a][signatureLength];
 
 	unsigned char *digest_arr[n];
 	const unsigned char *condensed_sig_arr[n - a];
@@ -278,7 +279,6 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 //	for(int i = 0;i < n; i++)
 //	{
 //		digest_arr[i] = digest[i];
-//		multipliedDigest_arr[i] = multipliedDigest[i];
 //	}
 
 //	//Calculate SHA Hashes in GPU
@@ -314,12 +314,15 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 	RA_verify_stream((const unsigned char **)condensed_sig_arr, (const unsigned int *)digestLength, returned_condensed_sig_arr, returned_condensed_sigLength, n - a, 0);
 	sync(0);
 
+	int x;
 	for(int i = 0;i < n - a ; i++)
 	{
-		BN_bin2bn(returned_condensed_sigs[i], signatureLength, condensedSignature_bn);
-		BN_bin2bn(multipliedDigest[i], multipliedHashLength[i], digest_bn);
-
-		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
+//		BN_bin2bn(returned_condensed_sigs[i], signatureLength, condensedSignature_bn);
+//		BN_bin2bn(multipliedDigest[i], multipliedHashLength[i], digest_bn);
+//
+//		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
+		x = memcmp(returned_condensed_sigs[i],multipliedDigest[i],signatureLength);
+		assert(x==0);
 	}
 
 	return 1;
