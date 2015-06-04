@@ -745,6 +745,7 @@ static char usage[] = "Usage: %s -m MP,RNS,CPU [-s number of stream (MP-mode onl
 int main(int argc, char *argv[])
 {
     int rsa_sign = 0;
+    int ntru_sign = 0;
     srand(time(NULL));
 #if 0
     int count = 0;
@@ -804,6 +805,10 @@ int main(int argc, char *argv[])
         {
             rsa_sign = 1;
         }
+        else if (strcmp(argv[i], "-n") == 0)
+        {
+        	ntru_sign = 1;
+        }
         else
         {
             goto parse_error;
@@ -813,6 +818,23 @@ int main(int argc, char *argv[])
 
     if (!(mp || rns || cpu))
         goto parse_error;
+
+    if(ntru_sign == 1)
+    {
+
+
+
+
+    }
+    else if(ntru_sign == 0)
+    {
+    	//without ntru
+    	//
+    }
+    else
+    {
+    	goto parse_error;
+    }
 
     if(rsa_sign == 0)
     {

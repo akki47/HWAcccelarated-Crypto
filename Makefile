@@ -120,12 +120,23 @@ $(OBJS_DIR)/%.o : %.cc
 
 $(OBJS_DIR)/%.o : %.cu
 	$(NVCC) -G -g -DMP_USE_64BIT=1 $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
+	
+SUBDIRS := src
+
+# Targets.
+.PHONY : all $(SUBDIRS)
+all : $(SUBDIRS)
+
+# Subdirectory rules.
+$(SUBDIRS) :
+	$(MAKE) -C $@	
 
 .PHONY : clean
 
 
 clean:
-	rm -f $(TARGET) $(OBJS) $(DEPS)
+	rm -f $(TARGET) $(OBJS) $(DEPS);
+	for dir in $(SUBDIRS) ; do $(MAKE) -C $$dir clean; done
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPS)

@@ -63,10 +63,15 @@ main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
+
+
   printf("Parameters:\n\t N: %d, p: %d, g: %d, k: %d, b: %d, t: %d\n\n",
       PASS_N, PASS_p, PASS_g, PASS_k, PASS_b, PASS_t);
+  int k=2;
 
-  printf("Generating %d signatures %s\n", TRIALS,
+    for( k=2;k<=1024;k=k*2)
+    {
+  printf("Generating %d signatures %s\n", k,
           VERIFY ? "and verifying" : "and not verifying");
 
   gen_key(key);
@@ -87,11 +92,12 @@ main(int argc, char **argv)
   gen_pubkey(pubkey, key);
 #endif
 
+
   clock_t c0,c1;
   c0 = clock();
 
   count = 0;
-  for(i=0; i<TRIALS; i++) {
+  for(i=0; i<k; i++) {
    in[(i&0xff)]++; /* Hash a different message each time */
    count += sign(h, z, key, in, MLEN);
 
@@ -104,11 +110,11 @@ main(int argc, char **argv)
   c1 = clock();
   printf("Total attempts: %d\n",  count);
 #if VERIFY
-  printf("Valid signatures: %d/%d\n",  nbver, TRIALS);
+  printf("Valid signatures: %d/%d\n",  nbver, k);
 #endif
-  printf("Attempts/sig: %f\n",  (((float)count)/TRIALS));
-  printf("Time/sig: %fs\n", (float) (c1 - c0)/(TRIALS*CLOCKS_PER_SEC));
-
+  printf("Attempts/sig: %f\n",  (((float)count)/k));
+  printf("Time/sig: %fs\n", (float) (c1 - c0)/(k*CLOCKS_PER_SEC));
+  }
 #if DEBUG
   printf("\n\nKey: ");
   for(i=0; i<PASS_N; i++)
