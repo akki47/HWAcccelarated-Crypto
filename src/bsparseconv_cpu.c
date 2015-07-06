@@ -1,5 +1,5 @@
 /*
- * CPASSREF/key.c
+ * CPASSREF/bsparseconv.c
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,53 +19,36 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-
 #include "constants.h"
 #include "pass_types.h"
-#include "ntt.h"
-#include "randombytes.h"
-#include "pass.h"
-
-
-#define RAND_LEN (64)
+#include "bsparseconv.h"
 
 int
-gen_key(int64 *f) //generating private key
+bsparseconv (int64 *c, const int64 *a, const b_sparse_poly *b)
 {
-  int i = 0;
-  int j = 0;
-  uint64 r = 0;
-  uint64 pool[RAND_LEN];
-  randombytes((unsigned char*)pool, RAND_LEN*sizeof(uint64));
+  int64 i = 0;
+  int64 j = 0;
+  int64 k = 0;
 
-  while(i < PASS_N) {
-    if(j == RAND_LEN) {
-      randombytes((unsigned char*)pool, RAND_LEN*sizeof(uint64));
-      j = 0;
+  for (i = 0; i < PASS_b; i++) {
+    k = b->ind[i];
+
+    if(b->val[k] > 0) {
+      for (j = k; j < PASS_N; j++) {
+        c[j] += a[j-k];
+      }
+      for (j = 0; j < k; j++) {
+        c[j] += a[j-k+PASS_N];
+      }
+    }else{ /* b->val[i] == -1 */
+      for (j = k; j < PASS_N; j++) {
+        c[j] -= a[j-k];
+      }
+      for (j = 0; j < k; j++) {
+        c[j] -= a[j-k+PASS_N];
+      }
     }
-    if(!r) r = pool[j++];
-    switch(r & 0x03) {
-      case 1: f[i] = -1; break;
-      case 2: f[i] =  0; break;
-      case 3: f[i] =  1; break;
-      default:  r >>= 2; continue;
-    }
-    r >>= 2;
-    i++;
   }
-
-  return 0;
-}
-
-int
-gen_pubkey(int64 *pkey, int64 *skey)
-{
-  int i;
-  int64 Ff[PASS_N] = {0};
-  ntt(Ff, skey);
-  for(i=0; i<PASS_t; i++)
-    pkey[S[i]] = Ff[S[i]];
 
   return 0;
 }

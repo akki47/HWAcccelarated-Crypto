@@ -1,5 +1,5 @@
 /*
- * CPASSREF/bsparseconv.h
+ * CPASSREF/pass.h
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,14 +19,40 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CPASSREF_BSPARSECONV_H_
-#define CPASSREF_BSPARSECONV_H_
+#ifndef CPASSREF_PASS_H_
+#define CPASSREF_PASS_H_
 
-#include </usr/local/cuda-7.0/include/cuda_runtime.h>
-#include </usr/local/cuda-7.0/include/cuda.h>
 
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b);
+/* Return values for verify */
+#define VALID 0
+#define INVALID (-1)
 
-int bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
+
+static const int64 S[PASS_t] = {
+#include PASS_EVAL_POINTS
+  };
+
+int
+gen_key(int64 *f);
+
+int
+gen_pubkey(int64 *pkey, int64 *skey);
+
+int
+init_fast_prng();
+
+int
+mknoise(int64 *y);
+
+int
+reject(const int64 *z);
+
+int
+sign(unsigned char *h, int64 *z, const int64 *key,
+    const unsigned char *message, const int msglen);
+
+int
+verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
+    const unsigned char *message, const int msglen);
 
 #endif

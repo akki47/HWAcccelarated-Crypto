@@ -1,5 +1,5 @@
 /*
- * CPASSREF/bsparseconv.h
+ * CPASSREF/formatc.h
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,14 +19,10 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CPASSREF_BSPARSECONV_H_
-#define CPASSREF_BSPARSECONV_H_
+#ifndef CPASSREF_FORMATC_H_
+#define CPASSREF_FORMATC_H_
 
-#include </usr/local/cuda-7.0/include/cuda_runtime.h>
-#include </usr/local/cuda-7.0/include/cuda.h>
-
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b);
-
-int bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
+int
+formatc(b_sparse_poly *c, const unsigned char *digest);
 
 #endif

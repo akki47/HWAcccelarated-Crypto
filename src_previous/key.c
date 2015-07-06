@@ -31,7 +31,7 @@
 #define RAND_LEN (64)
 
 int
-gen_key(int64 *f) //generating private key
+gen_key(int64 *f)
 {
   int i = 0;
   int j = 0;

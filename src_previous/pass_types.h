@@ -1,5 +1,5 @@
 /*
- * CPASSREF/bsparseconv.h
+ * CPASSREF/pass_types.h
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,14 +19,25 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CPASSREF_BSPARSECONV_H_
-#define CPASSREF_BSPARSECONV_H_
+#ifndef CPASSREF_TYPES_H_
+#define CPASSREF_TYPES_H_
 
-#include </usr/local/cuda-7.0/include/cuda_runtime.h>
-#include </usr/local/cuda-7.0/include/cuda.h>
+#include <stdint.h>
 
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b);
+typedef int16_t int16;
+typedef uint16_t uint16;
 
-int bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
+typedef int32_t int32;
+typedef uint32_t uint32;
+
+typedef int64_t int64;
+typedef uint64_t uint64;
+
+typedef double fftw_real;
+
+typedef struct {
+  unsigned int ind[PASS_b];
+  int64 val[PASS_N];
+} b_sparse_poly;
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * CPASSREF/key.c
+ * CPASSREF/verify.c
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,54 +19,53 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
+#include <string.h>
 
 #include "constants.h"
 #include "pass_types.h"
+#include "poly.h"
+#include "hash.h"
+#include "formatc.h"
 #include "ntt.h"
-#include "randombytes.h"
 #include "pass.h"
 
 
-#define RAND_LEN (64)
+#define CLEAR(f) memset((f), 0, PASS_N*sizeof(int64))
 
 int
-gen_key(int64 *f) //generating private key
-{
-  int i = 0;
-  int j = 0;
-  uint64 r = 0;
-  uint64 pool[RAND_LEN];
-  randombytes((unsigned char*)pool, RAND_LEN*sizeof(uint64));
-
-  while(i < PASS_N) {
-    if(j == RAND_LEN) {
-      randombytes((unsigned char*)pool, RAND_LEN*sizeof(uint64));
-      j = 0;
-    }
-    if(!r) r = pool[j++];
-    switch(r & 0x03) {
-      case 1: f[i] = -1; break;
-      case 2: f[i] =  0; break;
-      case 3: f[i] =  1; break;
-      default:  r >>= 2; continue;
-    }
-    r >>= 2;
-    i++;
-  }
-
-  return 0;
-}
-
-int
-gen_pubkey(int64 *pkey, int64 *skey)
+verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
+    const unsigned char *message, const int msglen)
 {
   int i;
-  int64 Ff[PASS_N] = {0};
-  ntt(Ff, skey);
-  for(i=0; i<PASS_t; i++)
-    pkey[S[i]] = Ff[S[i]];
+  b_sparse_poly c;
+  int64 Fc[PASS_N] = {0};
+  int64 Fz[PASS_N] = {0};
+  unsigned char msg_digest[HASH_BYTES];
+  unsigned char h2[HASH_BYTES];
 
-  return 0;
+  if(reject(z))
+    return INVALID;
+
+  CLEAR(c.val);
+  formatc(&c, h);
+
+  ntt(Fc, c.val);
+  ntt(Fz, z);
+
+  for(i=0; i<PASS_t; i++) {
+    Fz[S[i]] -= Fc[S[i]] * pubkey[S[i]];
+  }
+
+  poly_cmod(Fz);
+
+  crypto_hash_sha512(msg_digest, message, msglen);
+  hash(h2, Fz, msg_digest);
+
+  for(i=0; i<HASH_BYTES; i++) {
+    if(h2[i] != h[i])
+      return INVALID;
+  }
+
+  return VALID;
 }
 

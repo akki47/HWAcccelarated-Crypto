@@ -22,11 +22,7 @@
 #ifndef CPASSREF_BSPARSECONV_H_
 #define CPASSREF_BSPARSECONV_H_
 
-#include </usr/local/cuda-7.0/include/cuda_runtime.h>
-#include </usr/local/cuda-7.0/include/cuda.h>
-
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b);
-
-int bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
+int
+bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * CPASSREF/key.c
+ * CPASSREF/poly.c
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,54 +19,23 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-
 #include "constants.h"
 #include "pass_types.h"
-#include "ntt.h"
-#include "randombytes.h"
-#include "pass.h"
-
-
-#define RAND_LEN (64)
+#include "poly.h"
 
 int
-gen_key(int64 *f) //generating private key
+poly_cmod(int64 *a)
 {
-  int i = 0;
-  int j = 0;
-  uint64 r = 0;
-  uint64 pool[RAND_LEN];
-  randombytes((unsigned char*)pool, RAND_LEN*sizeof(uint64));
-
-  while(i < PASS_N) {
-    if(j == RAND_LEN) {
-      randombytes((unsigned char*)pool, RAND_LEN*sizeof(uint64));
-      j = 0;
+  int64 i;
+  for (i=0; i<PASS_N; i++) {
+    if (a[i] >= 0) {
+      a[i] %= PASS_p;
+    } else {
+      a[i] = PASS_p + (a[i] % PASS_p);
     }
-    if(!r) r = pool[j++];
-    switch(r & 0x03) {
-      case 1: f[i] = -1; break;
-      case 2: f[i] =  0; break;
-      case 3: f[i] =  1; break;
-      default:  r >>= 2; continue;
-    }
-    r >>= 2;
-    i++;
+    if (a[i] > ((PASS_p-1)/2))
+      a[i] -= PASS_p;
   }
 
   return 0;
 }
-
-int
-gen_pubkey(int64 *pkey, int64 *skey)
-{
-  int i;
-  int64 Ff[PASS_N] = {0};
-  ntt(Ff, skey);
-  for(i=0; i<PASS_t; i++)
-    pkey[S[i]] = Ff[S[i]];
-
-  return 0;
-}
-
