@@ -169,7 +169,7 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 //    bsparseconv_kernel<<<num_blocks,num_threads>>>(y_d, key_d, c_d);
 //    /* No modular reduction required. */
 
-	 bsparseconv_gpu(y_d, key_d, c_d);
+	 bsparseconv(y_d, key_d, c_d);
 	 cudaMemcpy(y,y_d,size,cudaMemcpyDeviceToHost);
 
     count++;

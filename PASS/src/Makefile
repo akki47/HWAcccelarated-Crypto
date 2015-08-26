@@ -12,7 +12,7 @@ CFLAGS += -c
 CFLAGS += -Wall
 CFLAGS += -O3 -ffast-math -mtune=native -malign-double
 
-LDFLAGS = -lfftw3 -lm 
+LDFLAGS = -lfftw3 -lm -lcrypto 
 
 SOURCES=$(wildcard *.c)
 OBJECTS=$(SOURCES:.c=.o)
