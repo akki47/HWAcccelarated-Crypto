@@ -1,0 +1,99 @@
+# HWAcccelarated-Crypto
+GENERAL
+=======
+
+This library contains implementations of cryptographic algorithms
+such as AES-HASH(Davis-Meyer hash), RSA-SIGN, Condensed-RSA, both in 
+CPU and GPU. These can be used for further research and modifications
+for fast authentication in System-on-chips.
+
+THe basic framework and AES,RSA code is forked from the libgpucrypto library.
+libgpucrypto is subset of SSLShader software that implements
+few cryptographic algorithms: AES, SHA1, RSA using CUDA.
+This code is distributed under BSD-style license.
+Read LICENSE for more details.
+
+SETUP
+=====
+
+1) install required libraries
+ you can download CUDA stuff at
+ http://developer.nvidia.com/cuda-toolkit-40
+
+2) install OpenSSL libraries and headers
+ you can download OpenSSL at
+ http://openssl.org/source/
+
+3) configure following variables in Makefile.in
+ OPENSSL_DIR
+ CUDA_TOOLKIT_DIR
+ CUDA_SDK_DIR
+
+if you're using system default opeenssl development library,
+then you can leave it as blank.
+
+4) build libgpucrypto
+ make
+
+5) try running test code
+
+examples)
+#./bin/aes_test -m ENC
+#./bin/rsa_test -m MP
+#./bin/sha_test
+
+you can see more detailed usage by running program w/o arguments or w/ incorrect one :).
+
+
+HOW TO USE
+==========
+Please see test folder for example codes that uses libgpucrypto.
+Using this code requires some prior knowledge on CUDA programming and
+GPU codes are written in a way to optimize performance rather than usability,
+and the data structure it's API receives is quite complex to document.
+Please see below functions and codes for how to use GPU library.
+
+RSA: rsa_test.cc: test_latency_rsa
+AES: aes_test.cc: test_latency_ase_cbc_encrypt, test_latency_aes_cbc_decrypt
+SHA1: sha_test.cc: test_latency_hmac_sha1
+
+AES and SHA1 test codes have a function to transform
+somewhat human friendly data structure to GPU code's structure.
+See aes_cbc_encrypt_prepare, aes_cbc_decrypt_prepare, and hmac_sha1_prepare
+to better understand the exact data structure used for GPU code.
+
+
+NOTE
+====
+* Support for multi-threaded applications
+Sharing a device context between threads does not work
+CUDA 3.2 or earlier versions.
+CUDA 4.0 supports sharing GPU context among multiple threads,
+but we have not tested this capability with our code.
+
+* 64-bit native integer arithmetic for RSA
+RSA codes exploits 64-bit native integer support in CUDA 2.x devices.
+Use of 64-bit native integer or not is decided during build process.
+If you have CUDA 2.x device, and our codes does not utilize it correctly,
+then you may fix it by modifying IS_FERMI variable in Makefile.in file.
+
+* Alignment issue
+AES and SHA1 GPU codes can handle non multiple of 16 bytes data,
+however input data should be aligned before passed into GPU.
+The current test code that we provide do not deal with it,
+and will not work correctly if you try non-multiple of 16 bytes.
+
+* Known issues 
+1) Target the proper architecture of the graphic card in Makefile.
+   # CUDA code generation flags
+GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
+GENCODE_SM20    := -gencode arch=compute_20,code=sm_20
+GENCODE_SM30    := -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
+GENCODE_FLAGS   :=  $(GENCODE_SM30) ?????????????
+
+CONTACTS
+========
+For more information about the project throw a mail to:
+ ipapapan@purdue.edu
+ asingla@purdue.edu
+ amudgeri@purdue.edu
