@@ -24,7 +24,7 @@ endif
 DARWIN = $(strip $(findstring DARWIN, $(OSUPPER)))
 
 # Location of the CUDA Toolkit binaries and libraries
-CUDA_PATH       ?= /usr/local/cuda-7.0
+CUDA_PATH       ?= /usr/local/cuda-7.5
 CUDA_INC_PATH   ?= $(CUDA_PATH)/include
 CUDA_BIN_PATH   ?= $(CUDA_PATH)/bin
 ifneq ($(DARWIN),)
@@ -79,7 +79,7 @@ endif
 
 
 # Common includes and paths for CUDA
-NVCCINCLUDES      := -I$(CUDA_INC_PATH) -I. -I/usr/local/cuda-6.5/samples/common/inc/ -I/usr/local/cuda-6.5/samples/common/inc
+NVCCINCLUDES      := -I$(CUDA_INC_PATH) -I. -I/usr/local/cuda-7.5/samples/common/inc/ -I/usr/local/cuda-7.5/samples/common/inc
 
 ####################################################
 
@@ -121,22 +121,22 @@ $(OBJS_DIR)/%.o : %.cc
 $(OBJS_DIR)/%.o : %.cu
 	$(NVCC) -G -g -DMP_USE_64BIT=1 $(NVCCFLAGS) $(GENCODE_FLAGS) $(NVCCINCLUDES) -c $< -o $@
 	
-SUBDIRS := src
-
-# Targets.
-.PHONY : all $(SUBDIRS)
-all : $(SUBDIRS)
-
-# Subdirectory rules.
-$(SUBDIRS) :
-	$(MAKE) -C $@	
+#SUBDIRS := src
+#
+## Targets.
+#.PHONY : all $(SUBDIRS)
+#all : $(SUBDIRS)
+#
+## Subdirectory rules.
+#$(SUBDIRS) :
+#	$(MAKE) -C $@	
 
 .PHONY : clean
 
 
 clean:
 	rm -f $(TARGET) $(OBJS) $(DEPS);
-	for dir in $(SUBDIRS) ; do $(MAKE) -C $$dir clean; done
+	#for dir in $(SUBDIRS) ; do $(MAKE) -C $$dir clean; done
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPS)
