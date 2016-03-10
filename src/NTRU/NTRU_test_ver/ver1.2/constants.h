@@ -36,7 +36,7 @@
 #define PASS_RADER_POLY "../data/433_rader.dat"
 #define PASS_PERMUTATION "../data/433_perm.dat"
 #define PASS_EVAL_POINTS "../data/433_points.dat"
-#define PASS_WISDOM "./data/433_wisdom.dat"
+#define PASS_WISDOM "home/citadmin/Desktop/crypto_algos/ntru-crypto-master/reference-code/C/Sign/PASS/data/433_wisdom.dat"
 #endif
 
 #if PASS_N ==  577

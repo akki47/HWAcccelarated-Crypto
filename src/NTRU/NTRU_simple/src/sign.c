@@ -94,6 +94,9 @@ sign(unsigned char *h, int64 *z, const int64 *key,
   b_sparse_poly c;
   int64 y[PASS_N];
   int64 Fy[PASS_N];
+
+  //sparse polynomial g
+  int64 g[PASS_N];
   unsigned char msg_digest[HASH_BYTES];
 
   crypto_hash_sha512(msg_digest, message, msglen);
@@ -109,9 +112,23 @@ sign(unsigned char *h, int64 *z, const int64 *key,
     CLEAR(c.val);
     formatc(&c, h);
 
+    //Original NTRUSign protocol
+
+    //generating polynomial g = f*h (move this to a seperate generate keys method because this can cause
+    //problems in performance comp)
+    bsparseconv(g,key,pkey);
+
+    bsparseconv(x,g,&c); //generating x = (-1/q)m*g
+
     /* z = y += f*c */
-    bsparseconv(y, key, &c);
+    bsparseconv(y, key, &c);	//generating y = (1/q)m*f
     /* No modular reduction required. */
+
+    for(int i=0;i<PASS_N;i++)
+    {
+    	y[i] = y[i]-x[i];
+    }
+
 
     count++;
   } while (reject(y));

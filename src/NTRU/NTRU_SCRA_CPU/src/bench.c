@@ -92,7 +92,7 @@ main(int argc, char **argv)
 
   int k;
   printf("\n#msg \t without SCRA \t Offline Stage \t Online Stage \t Verify Stage \t With SCRA");
-
+	
   for(k=32;k< NO_MSGS; k=k*2)
   {
   clock_t c0,c1,off0,off1,on0,on1,ver1,ver0;
@@ -126,9 +126,9 @@ main(int argc, char **argv)
   SHA1_Init(&ctx);
 
   on0 = clock();
-  unsigned char hash[100][SHA_DIGEST_LENGTH];
+  unsigned char hash[8192][SHA_DIGEST_LENGTH];
   int j;
-  for(j=0;j<(k/16);j++)
+  for(j=0;j<(k-16);j++)
   {
 
   for(i=0;i<16;i++) //online stage
@@ -158,8 +158,8 @@ main(int argc, char **argv)
    #endif
   }
 
-  unsigned char hash_verify[100][SHA_DIGEST_LENGTH];
-  for(j=0;j<(k/16);j++)
+  unsigned char hash_verify[8192][SHA_DIGEST_LENGTH];
+  for(j=0;j<(k-16);j++)
   {
   for(i=0;i<16;i++)
   {
@@ -169,7 +169,7 @@ main(int argc, char **argv)
    SHA1_Final(hash_verify[j], &ctx);
   }
 
-  for(j=0;j<(k/16);j++)
+  for(j=0;j<(k-16);j++)
   {
    if(memcmp(hash[j],hash_verify[j],SHA_DIGEST_LENGTH))
    {
