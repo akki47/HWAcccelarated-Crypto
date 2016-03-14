@@ -99,7 +99,7 @@ main(int argc, char **argv)
   count = 0;
   for(i=0; i<k; i++) {
    in[(i&0xff)]++; /* Hash a different message each time */
-   count += sign(h, z, key, in, MLEN);
+   count += sign(h, z, key, in, MLEN, pubkey);
 
 #if VERIFY
    nbver += (VALID == verify(h, z, pubkey, in, MLEN));

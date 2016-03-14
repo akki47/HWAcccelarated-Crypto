@@ -42,6 +42,39 @@ static uint16 randpool[RAND_LEN];
 static int randpos;
 
 int
+circ_conv(int64 *c, const int64 *a, const int64 *b)
+{
+	 int i,j,k;
+	 c[0]=0;
+	 int64 d[PASS_N];
+	 int64 x2[PASS_N];
+
+	 d[0]=b[0];
+
+	for(j=1;j<PASS_N;j++)            /*folding h(n) to h(-n)*/
+		d[j]=b[PASS_N -j];
+
+	 for(i=0;i<PASS_N;i++)
+		 c[0] += a[i]*d[i];
+
+	for(k=1;k<PASS_N;k++)
+	{
+				c[k]=0;
+				/*circular shift*/
+
+				for(j=1;j<PASS_N;j++)
+					x2[j]=d[j-1];
+				x2[0]=d[PASS_N-1];
+				for(i=0;i<PASS_N;i++)
+				{
+							d[i]=x2[i];
+							c[k]+=a[i]*x2[i];
+				}
+	}
+	return 0;
+}
+
+int
 init_fast_prng()
 {
   fastrandombytes((unsigned char*)randpool, RAND_LEN*sizeof(uint16));
@@ -88,21 +121,22 @@ reject(const int64 *z)
 
 int
 sign(unsigned char *h, int64 *z, const int64 *key,
-    const unsigned char *message, const int msglen)
+    const unsigned char *message, const int msglen, const int64 *pubkey)
 {
   int count;
   b_sparse_poly c;
   int64 y[PASS_N];
+  int64 x[PASS_N];
   int64 Fy[PASS_N];
 
-  //sparse polynomial g
+  //secret polynomial g
   int64 g[PASS_N];
   unsigned char msg_digest[HASH_BYTES];
 
   crypto_hash_sha512(msg_digest, message, msglen);
-
+  int i;
   count = 0;
-  do {
+  //do {
     CLEAR(Fy);
 
     mknoise(y);
@@ -116,7 +150,7 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 
     //generating polynomial g = f*h (move this to a seperate generate keys method because this can cause
     //problems in performance comp)
-    bsparseconv(g,key,pkey);
+    circ_conv(g,key,pubkey);
 
     bsparseconv(x,g,&c); //generating x = (-1/q)m*g
 
@@ -124,14 +158,15 @@ sign(unsigned char *h, int64 *z, const int64 *key,
     bsparseconv(y, key, &c);	//generating y = (1/q)m*f
     /* No modular reduction required. */
 
-    for(int i=0;i<PASS_N;i++)
+    i=0;
+    for(i=0;i<PASS_N;i++)
     {
     	y[i] = y[i]-x[i];
     }
 
 
     count++;
-  } while (reject(y));
+  //} while (reject(y));
 
 #if DEBUG
   int i;
