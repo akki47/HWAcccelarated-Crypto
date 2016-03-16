@@ -70,6 +70,7 @@ circ_conv(int64 *c, const int64 *a, const int64 *b)
 							d[i]=x2[i];
 							c[k]+=a[i]*x2[i];
 				}
+				c[k] = c[k]/PASS_b; //this should be q, check again (might be source of error)
 	}
 	return 0;
 }
