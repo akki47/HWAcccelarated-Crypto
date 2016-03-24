@@ -32,39 +32,39 @@
 
 #define CLEAR(f) memset((f), 0, PASS_N*sizeof(int64))
 
-int
-circ_conv(int64 *c, const int64 *a, const int64 *b)
-{
-	 int i,j,k;
-	 c[0]=0;
-	 int64 d[PASS_N];
-	 int64 x2[PASS_N];
-
-	 d[0]=b[0];
-
-	for(j=1;j<PASS_N;j++)            /*folding h(n) to h(-n)*/
-		d[j]=b[PASS_N -j];
-
-	 for(i=0;i<PASS_N;i++)
-		 c[0] += a[i]*d[i];
-
-	for(k=1;k<PASS_N;k++)
-	{
-				c[k]=0;
-				/*circular shift*/
-
-				for(j=1;j<PASS_N;j++)
-					x2[j]=d[j-1];
-				x2[0]=d[PASS_N-1];
-				for(i=0;i<PASS_N;i++)
-				{
-							d[i]=x2[i];
-							c[k]+=a[i]*x2[i];
-				}
-				c[k] = c[k]/PASS_b; //this should be q, check again (might be source of error)
-	}
-	return 0;
-}
+//int
+//circ_conv(int64 *c, const int64 *a, const int64 *b)
+//{
+//	 int i,j,k;
+//	 c[0]=0;
+//	 int64 d[PASS_N];
+//	 int64 x2[PASS_N];
+//
+//	 d[0]=b[0];
+//
+//	for(j=1;j<PASS_N;j++)            /*folding h(n) to h(-n)*/
+//		d[j]=b[PASS_N -j];
+//
+//	 for(i=0;i<PASS_N;i++)
+//		 c[0] += a[i]*d[i];
+//
+//	for(k=1;k<PASS_N;k++)
+//	{
+//				c[k]=0;
+//				/*circular shift*/
+//
+//				for(j=1;j<PASS_N;j++)
+//					x2[j]=d[j-1];
+//				x2[0]=d[PASS_N-1];
+//				for(i=0;i<PASS_N;i++)
+//				{
+//							d[i]=x2[i];
+//							c[k]+=a[i]*x2[i];
+//				}
+//				c[k] = c[k]/PASS_b; //this should be q, check again (might be source of error)
+//	}
+//	return 0;
+//}
 
 int
 verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
@@ -109,7 +109,7 @@ verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
      */
 
     bsparseconv(t,pubkey,&c);
-    int i;
+    //int i;
     // hash has to encoded to N bytes, make changes to add this technique (might be reason for failure of some sigs)
     // also check value of PASS_b -> q
     for(i=0;i<PASS_N;i++)
