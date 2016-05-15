@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <openssl/sha.h>
+
 
 #include "constants.h"
 #include "pass_types.h"

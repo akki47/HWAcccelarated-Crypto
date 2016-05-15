@@ -23,7 +23,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 #include "constants.h"
 #include "pass_types.h"
 #include "poly.h"
@@ -34,8 +33,9 @@
 #include "fastrandombytes.h"
 #include "pass.h"
 
-#include </usr/local/cuda-7.0/include/cuda.h>
-#include </usr/local/cuda-7.0/include/cuda_runtime.h>
+#include </usr/local/cuda-6.5/include/cuda.h>
+#include </usr/local/cuda-6.5/include/cuda_runtime.h>
+
 
 #define CLEAR(f) memset((f), 0, PASS_N*sizeof(int64))
 
@@ -43,6 +43,40 @@
 
 static uint16 randpool[RAND_LEN];
 static int randpos;
+
+int
+circ_conv(int64 *c, const int64 *a, const int64 *b)
+{
+	 int i,j,k;
+	 c[0]=0;
+	 int64 d[PASS_N];
+	 int64 x2[PASS_N];
+
+	 d[0]=b[0];
+
+	for(j=1;j<PASS_N;j++)            /*folding h(n) to h(-n)*/
+		d[j]=b[PASS_N -j];
+
+	 for(i=0;i<PASS_N;i++)
+		 c[0] += a[i]*d[i];
+
+	for(k=1;k<PASS_N;k++)
+	{
+				c[k]=0;
+				/*circular shift*/
+
+				for(j=1;j<PASS_N;j++)
+					x2[j]=d[j-1];
+				x2[0]=d[PASS_N-1];
+				for(i=0;i<PASS_N;i++)
+				{
+							d[i]=x2[i];
+							c[k]+=a[i]*x2[i];
+				}
+				c[k] = c[k]/PASS_b; //this should be q, check again (might be source of error)
+	}
+	return 0;
+}
 
 int
 init_fast_prng()
@@ -91,43 +125,24 @@ reject(const int64 *z)
 
 int
 sign(unsigned char *h, int64 *z, const int64 *key,
-    const unsigned char *message, const int msglen)
+    const unsigned char *message, const int msglen, const int64 *pubkey)
 {
   int count;
-//  int msg_count=1;
   b_sparse_poly c;
   int64 y[PASS_N];
+  int64 x[PASS_N];
   int64 Fy[PASS_N];
+
+  //secret polynomial g
+  int64 g[PASS_N];
   unsigned char msg_digest[HASH_BYTES];
 
   crypto_hash_sha512(msg_digest, message, msglen);
-
-  int size = PASS_N * sizeof(int64);
-  int64 *y_d,*key_d;
-
-  b_sparse_poly *c_h = (b_sparse_poly*)malloc(sizeof(b_sparse_poly));
-  cudaMalloc((void **) &y_d,size);
-  cudaMalloc((void **) &key_d,size);
-  b_sparse_poly *c_d;
-  cudaMalloc(&c_d,sizeof(b_sparse_poly));
-
   int i;
-
-  for ( i=0; i<PASS_b; i++)
-      {
-  cudaMalloc(&(c_h->ind[i]), PASS_b * sizeof(unsigned int));
-      }
-
-  for ( i=0; i<PASS_N; i++)
-      {
-  cudaMalloc(&(c_h->val[i]), PASS_N * sizeof(int64));
-      }
-
   count = 0;
-  do {
+  //do {
     CLEAR(Fy);
 
-    //using same y for now, remember to change later**
     mknoise(y);
     ntt(Fy, y);
     hash(h, Fy, msg_digest);
@@ -135,50 +150,54 @@ sign(unsigned char *h, int64 *z, const int64 *key,
     CLEAR(c.val);
     formatc(&c, h);
 
-    //cuda memory allocation
-    memcpy(c_h, &c, sizeof(b_sparse_poly));
+    //Original NTRUSign protocol
 
-    //allocation
-    cudaMemcpy(y_d,y,size,cudaMemcpyHostToDevice);
+    //generating polynomial g = f*h (move this to a seperate generate keys method because this can cause
+    //problems in performance comp)
+    circ_conv(g,key,pubkey);
 
+    int64 d_x[PASS_N];
+    int64 d_y[PASS_N];
+	int64 d_g[PASS_N];
+	int64 d_key[PASS_N];
+	b_sparse_poly d_c;
 
-    cudaMemcpy(key_d,key,size,cudaMemcpyHostToDevice);
+	cudaMalloc(&d_x, (PASS_N * sizeof(int64)));
+	cudaMalloc(&d_g, (PASS_N * sizeof(int64)));
+	cudaMalloc(&d_c, (sizeof(b_sparse_poly)));
+	cudaMalloc(&d_y, (PASS_N * sizeof(int64)));
+	cudaMalloc(&d_key, (PASS_N * sizeof(int64)));
 
-    for (i=0; i<PASS_b; i++)
-    {
-	cudaMemcpy(c_h->ind[i], c.ind[i],  PASS_b*sizeof(unsigned int), cudaMemcpyHostToDevice);
-    }
+	cudaMemcpy(x,d_x,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+	cudaMemcpy(&c,&d_c, sizeof(b_sparse_poly),cudaMemcpyDeviceToHost);
+	cudaMemcpy(g,d_g,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+	cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+	cudaMemcpy(key,d_key,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+    //bsparseconv(x,g,&c); //generating x = (-1/q)m*g
+    bsparseconv_gpu(d_x, d_g, &d_c);
+    cudaMemcpy(x,d_x,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
 
-    for ( i=0; i<PASS_N; i++)
-    {
-    cudaMemcpy(c_h->val[i], c.val[i],  PASS_N*sizeof(int64), cudaMemcpyHostToDevice);
-    }
-
-
-	cudaMemcpy(c_d, c_h, sizeof(b_sparse_poly),cudaMemcpyHostToDevice);
-
-    cudaMalloc((void **) &c_d,size2);
-    cudaMemcpy(c_d,c,size2,cudaMemcpyHostToDevice);
-
-    //cuda memory allocation end
-
-	unsigned int num_blocks = msg_count ;
-	unsigned int num_threads = ((PASS_N-1)/4)+1;
 
     /* z = y += f*c */
-    bsparseconv_kernel<<<num_blocks,num_threads>>>(y_d, key_d, c_d);
+    bsparseconv_gpu(d_y, d_key, &d_c);	//generating y = (1/q)m*f
     /* No modular reduction required. */
 
-	 bsparseconv(y_d, key_d, c_d);
-	 cudaMemcpy(y,y_d,size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+//    cudaFree(d_y);
+//    cudaFree(d_x);
+//    cudaFree(d_key);
+//    cudaFree(d_g);
+//    cudaFree(&d_c);
+
+    i=0;
+    for(i=0;i<PASS_N;i++)
+    {
+    	y[i] = y[i]-x[i];
+    }
+
 
     count++;
-  } while (reject(y));
-
-
-  cudaFree(y_d);
-  cudaFree(key_d);
-  cudaFree(c_d);
+  //} while (reject(y));
 
 #if DEBUG
   int i;
