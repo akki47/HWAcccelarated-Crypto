@@ -38,6 +38,8 @@
 
 #define RAND_LEN (4096)
 
+#define DEV_CONST 217
+
 static uint16 randpool[RAND_LEN];
 static int randpos;
 
@@ -114,10 +116,40 @@ reject(const int64 *z)
 
   for(i=0; i<PASS_N; i++) {
     if(abs(z[i]) > (PASS_k - PASS_b))
+    {
       return 1;
+    }
   }
 
   return 0;
+}
+
+int
+rejectntru(b_sparse_poly *t, b_sparse_poly *c)
+{
+	int64 i = 0;
+    int64 k1 = 0;
+    int64 k2 = 0;
+    int dev=0; //deviation
+
+	for (i = 0; i < PASS_b; i++) {
+	    k1 = t->ind[i];
+	    k2 = c->ind[i];
+
+	    if(t->val[k1] != c->val[k2])
+	    	dev++;
+	}
+
+	//printf("\nDeviation is %d\n",dev);
+	if(dev > DEV_CONST)
+	{
+		return 1;
+		printf("\nrejected in ntrusign\n");
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 int
@@ -126,9 +158,18 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 {
   int count;
   b_sparse_poly c;
-  int64 y[PASS_N];
+  b_sparse_poly c2;
+  int64 sig[PASS_N*2];
+  int64 y[PASS_N*2];
+  int64 t[PASS_N];
+  int64 y1[PASS_N];
+  int64 y2[PASS_N];
+  int64 y3[PASS_N];
   int64 x[PASS_N];
   int64 Fy[PASS_N];
+
+  int64 Fy1[PASS_N];
+  int64 Fy2[PASS_N];
 
   //secret polynomial g
   int64 g[PASS_N];
@@ -137,15 +178,29 @@ sign(unsigned char *h, int64 *z, const int64 *key,
   crypto_hash_sha512(msg_digest, message, msglen);
   int i;
   count = 0;
-  //do {
+  //do{
+  do {
     CLEAR(Fy);
 
-    mknoise(y);
+    CLEAR(Fy1);
+    CLEAR(Fy2);
+
+    //mknoise(y);
+    mknoise(y1);
+    //ntt(Fy, y1);
+    mknoise(y2);
+
+    memcpy(y,y1,PASS_N);
+    memcpy(y+PASS_N,y2,PASS_N);  // computing y = (y1,y2)
+    ntt(Fy1, y1);
+    ntt(Fy2, y2);	// computing P(y1,y2)
+
     ntt(Fy, y);
-    hash(h, Fy, msg_digest);
+
+    hash(h, Fy, msg_digest); //generating e = H(P(y1,y2),m)
 
     CLEAR(c.val);
-    formatc(&c, h);
+    formatc(&c, h);  // formating e to c (sparse polynomial)
 
     //Original NTRUSign protocol
 
@@ -162,12 +217,37 @@ sign(unsigned char *h, int64 *z, const int64 *key,
     i=0;
     for(i=0;i<PASS_N;i++)
     {
-    	y[i] = y[i]-x[i];
+    	y[i] = y[i]-x[i]; // s = -x*f - y*g
     }
-
-
     count++;
-  //} while (reject(y));
+
+    circ_conv(t,y,pubkey); //generating t=s*h
+    CLEAR(c2.val);
+    formatc(&c2,t); 		//converting t to sparse polynomial c2
+
+
+  } while (rejectntru(&c2,&c) > 0);
+
+    for(i=0;i<PASS_N;i++)
+            {
+            	y[i] = y1[i] - y[i] ; // x1 = 0 - s + y1
+            }
+
+    for(i=0;i<PASS_N;i++)
+                {
+                	y[i] = y1[i] - y[i] ; // x1 = 0 - s + y1
+                }
+
+    for(i=0;i<PASS_N;i++)
+                    {
+                    	y3[i] = h[i] - count + y2[i]; // x2 = e - t + y2 , x2=y3
+                    }
+
+    memcpy(sig,y,PASS_N);
+    memcpy(sig+PASS_N,y3,PASS_N);
+    //printf("\nRejected in rejection sampling\n");
+ // }
+ // while(reject(sig));
 
 #if DEBUG
   int i;
