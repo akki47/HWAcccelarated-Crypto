@@ -92,42 +92,48 @@ reject(const int64 *z)
 }
 
 int
-sign(unsigned char *h, int64 *z, const int64 *key,
-    const unsigned char *message, const int msglen)
+sign(unsigned char **h, int64 *z, const int64 *key,
+    const unsigned char *message, const int msglen, int k)
 {
   int count;
-  b_sparse_poly c;
-  int64 y[PASS_N];
+  b_sparse_poly c[k];
+  int64 y[k][PASS_N];
   int64 Fy[PASS_N];
   unsigned char msg_digest[HASH_BYTES];
 
   crypto_hash_sha512(msg_digest, message, msglen);
 
+  printf("not Started GPU allocation");
   count = 0;
   //do {
+  int i;
+  for( i=0;i<k;i++)
+  {
     CLEAR(Fy);
 
-    mknoise(y);
-    ntt(Fy, y);
-    hash(h, Fy, msg_digest);
+    mknoise(y[i]);
+    ntt(Fy, y[i]);
+    hash(h[i], Fy, msg_digest);
 
-    CLEAR(c.val);
-    formatc(&c, h);
-
+    CLEAR(c[i].val);
+    formatc(&c[i], h[i]);
+  }
     //gpu memory allocation
-    int64 d_y[PASS_N];
+    int64 d_y[k][PASS_N];
     int64 d_key[PASS_N];
-    b_sparse_poly d_c;
+    b_sparse_poly d_c[k];
 
-    cudaMalloc(&d_y, (PASS_N * sizeof(int64)));
+    printf("Started GPU allocation");
+
+    cudaMalloc(&d_y, (PASS_N * sizeof(int64)*k));
     cudaMalloc(&d_key, (PASS_N * sizeof(int64)));
-    cudaMalloc(&d_c, (sizeof(b_sparse_poly)));
+    cudaMalloc(&d_c, (sizeof(b_sparse_poly))*k);
 
-    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
-    cudaMemcpy(&c,&d_c, sizeof(b_sparse_poly),cudaMemcpyDeviceToHost);
+    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64))*k,cudaMemcpyDeviceToHost);
+    cudaMemcpy(c,d_c, sizeof(b_sparse_poly)*k,cudaMemcpyDeviceToHost);
     cudaMemcpy(key,d_key,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
     /* z = y += f*c */
-    bsparseconv_gpu(d_y, d_key, &d_c);
+    bsparseconv_gpu(d_y, d_key, &d_c,k);
 
     cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
     /* No modular reduction required. */
@@ -153,9 +159,10 @@ sign(unsigned char *h, int64 *z, const int64 *key,
         (long long int) c.val[c.ind[i]]);
   printf("\n");
 #endif
-
+  for(i=0;i<k;i++)
+  {
   memcpy(z, y, PASS_N*sizeof(int64));
-
+  }
   return count;
 }
 

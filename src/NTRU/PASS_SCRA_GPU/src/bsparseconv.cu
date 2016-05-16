@@ -6,48 +6,46 @@ extern "C" {
 #include "bsparseconv.h"
 }
 
-
-
-__global__ void bsparseconv_kernel(int64 *c, const int64 *a, const b_sparse_poly *b)
+__global__ void bsparseconv_kernel(int64 **c, const int64 *a, const b_sparse_poly **b)
 {
   int64 i = 0;
   int64 k = 0;
 
   int thread = threadIdx.x + blockDim.x*blockIdx.x;
+  int msg_count= blockIdx.x;
 
   if(thread < PASS_N)
   {
   for (i = 0; i < PASS_b; i++) {
-    k = b->ind[i];
+    k = b[msg_count]->ind[i];
 
-    if(b->val[k] > 0) {
+    if(b[msg_count]->val[k] > 0) {
 
     		if(thread < k)
     		{
 
-    				c[(thread)] += a[thread - k + PASS_N];
+    				c[msg_count][(thread)] += a[thread - k + PASS_N];
 
     		}
     		else //(thread >= k)
     		{
 
-    				c[thread] += a[thread-k];
+    				c[msg_count][thread] += a[thread-k];
 
     		}
-
     }
   else
     { /* b->val[i] == -1 */
 	  if(thread < k)
 	  		{
 
-	  				c[thread] -= a[thread - k + PASS_N];
+	  				c[msg_count][thread] -= a[thread - k + PASS_N];
 
 	  		}
 	  		else //(thread > k)
 	  		{
 
-	  				c[thread] -= a[thread-k];
+	  				c[msg_count][thread] -= a[thread-k];
 
 	  		}
     }
@@ -57,10 +55,10 @@ __global__ void bsparseconv_kernel(int64 *c, const int64 *a, const b_sparse_poly
 }
 
 
-extern "C" void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b)
+extern "C" void bsparseconv_gpu(int64 **c, const int64 *a, const b_sparse_poly **b, int k)
 {
 	int msg_count=1;
-	unsigned int num_blocks = msg_count ;
+	unsigned int num_blocks = k;
 	unsigned int num_threads = PASS_N;
 
 	    /* z = y += f*c */
