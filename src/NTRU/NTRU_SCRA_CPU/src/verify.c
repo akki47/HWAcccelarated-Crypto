@@ -80,8 +80,8 @@ verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
   //changes
   int64 t[PASS_N]={0};
 
-  if(reject(z))
-    return INVALID;
+  //if(reject(z))
+    //return INVALID;
 
   CLEAR(c.val);
   formatc(&c, h);

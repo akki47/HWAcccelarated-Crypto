@@ -45,3 +45,5 @@ hash(unsigned char *h, const int64 *y, const unsigned char *msg_digest)
   return 0;
 }
 
+
+
