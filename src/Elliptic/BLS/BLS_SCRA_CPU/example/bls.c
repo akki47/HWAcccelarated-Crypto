@@ -8,6 +8,8 @@
 #include <time.h>
 
 #define NO_MESS 8192
+#define maximumValueOfSCRAChunk 256
+#define numberOfSCRAChunks 20
 
 int main(int argc, char **argv) {
   pairing_t pairing;
@@ -19,6 +21,8 @@ int main(int argc, char **argv) {
   int i,j,k;
   clock_t c0,c1,off0,off1,on0,on1,ver1,ver0;
   float scra,ver,on;
+
+  element_t digest[maximumValueOfSCRAChunk * numberOfSCRAChunks];
 
   printf("\n#msg \t without SCRA \t Offline Stage \t Online Stage \t Verify Stage \t With SCRA");
 
@@ -69,19 +73,42 @@ int main(int argc, char **argv) {
 
 	//printf("Short signature test\n");
 
+//  //offline phase
+//	  off0 = clock();
+//  for(i=0;i<k;i++)
+//  {
+//  //h^secret_key is the signature
+//  //in real life: only output the first coordinate
+//  element_pow_zn(s[i], h, secret_key);
+//  //element_pow_zn(sig, h, secret_key);
+//  //element_printf("signature = %B\n", s[i]);
+//  //printf("%d\n",i);
+//  }
+//  off1 = clock();
+//  //offline phase end
+
   //offline phase
+	  int buffer,i,j;
 	  off0 = clock();
-  for(i=0;i<k;i++)
-  {
-  //h^secret_key is the signature
-  //in real life: only output the first coordinate
-  element_pow_zn(s[i], h, secret_key);
-  //element_pow_zn(sig, h, secret_key);
-  //element_printf("signature = %B\n", s[i]);
-  //printf("%d\n",i);
-  }
-  off1 = clock();
-  //offline phase end
+	for(i=0;i<numberOfSCRAChunks;i++)
+	{
+		for(j=0;j<maximumValueOfSCRAChunk;j++)
+		{
+			//h^secret_key is the signature
+			//in real life: only output the first coordinate
+			buffer =0;
+			buffer = buffer | (i << (sizeof(int) * 8 - 5));
+			buffer = buffer | (j << (sizeof(int) * 8 - 13));
+
+			element_from_hash(h,buffer, 13);
+			element_pow_zn(digest[(i*maximumValueOfSCRAChunk)+j], h, secret_key);
+			//element_pow_zn(sig, h, secret_key);
+			//element_printf("signature = %B\n", s[i]);
+			//printf("%d\n",i);
+		}
+	}
+	off1 = clock();
+	//offline phase end
 
   //without SCRA
   	c0 = clock();
