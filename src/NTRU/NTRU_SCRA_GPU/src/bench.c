@@ -100,7 +100,7 @@ main(int argc, char **argv)
 
   for(i=0; i<k; i++) {
      in[(i&0xff)]++; /* Hash a different message each time */
-     count += sign(h[i], z, key, in, MLEN, pubkey);
+     count += sign(h[i], z, key, in, MLEN,pubkey,1);
 #if VERIFY
    nbver += (VALID == verify(h[i], z, pubkey, in, MLEN));
    #endif
@@ -112,12 +112,12 @@ main(int argc, char **argv)
   count = 0;
   // offline stage
   off0 = clock();
-  for(i=0; i<k; i++) {
+  //for(i=0; i<k; i++) {
    in[(i&0xff)]++; /* Hash a different message each time */
-   count += sign(h[i], z, key, in, MLEN, pubkey);
+   count += sign(h[i], z, key, in, MLEN,pubkey,k);
 
 
-  }
+  //}
   off1 = clock();
   //offline stage end
   printf("\n");

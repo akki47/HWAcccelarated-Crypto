@@ -1,5 +1,5 @@
 /*
- * CPASSREF/bsparseconv.h
+ * CPASSREF/hash.c
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,12 +19,29 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CPASSREF_BSPARSECONV_H_
-#define CPASSREF_BSPARSECONV_H_
+#include <string.h>
+
+#include "constants.h"
+#include "pass_types.h"
+#include "hash.h"
+#include "pass.h"
 
 int
-bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
+hash(unsigned char *h, const int64 *y, const unsigned char *msg_digest)
+{
+  int i;
+  unsigned char in[PASS_t + HASH_BYTES];
+  unsigned char *pos = in + HASH_BYTES;
 
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b, int k);
+  memcpy(in, msg_digest, HASH_BYTES);
 
-#endif
+  for(i=0; i<PASS_t; i++) {
+    *pos = (unsigned char) (y[S[i]] & 0xff);
+    pos++;
+  }
+
+  crypto_hash_sha512(h, in, PASS_t + HASH_BYTES);
+
+  return 0;
+}
+

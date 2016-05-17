@@ -93,7 +93,7 @@ reject(const int64 *z)
 
 int
 sign(unsigned char *h, int64 *z, const int64 *key,
-    const unsigned char *message, const int msglen, int k)
+    const unsigned char *message, const int msglen)
 {
   int count;
   b_sparse_poly c;
@@ -107,14 +107,14 @@ sign(unsigned char *h, int64 *z, const int64 *key,
   count = 0;
   //do {
   int i;
-  CLEAR(Fy);
-  mknoise(y);
-  ntt(Fy, y);
-
- for( i=0;i<k;i++)
+  //for( i=0;i<k;i++)
   {
+    CLEAR(Fy);
 
+    mknoise(y);
+    ntt(Fy, y);
     hash(h, Fy, msg_digest);
+
     CLEAR(c.val);
     formatc(&c, h);
   }
@@ -125,17 +125,17 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 
     //printf("Started GPU allocation");
 
-    cudaMalloc(&d_y, (PASS_N * sizeof(int64))*k);
+    cudaMalloc(&d_y, (PASS_N * sizeof(int64)));
     cudaMalloc(&d_key, (PASS_N * sizeof(int64)));
-    cudaMalloc(&d_c, (sizeof(b_sparse_poly))*k);
+    cudaMalloc(&d_c, (sizeof(b_sparse_poly)));
 
-    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64))*k,cudaMemcpyDeviceToHost);
-    cudaMemcpy(&c,&d_c, sizeof(b_sparse_poly)*k,cudaMemcpyDeviceToHost);
+    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+    cudaMemcpy(&c,&d_c, sizeof(b_sparse_poly),cudaMemcpyDeviceToHost);
     cudaMemcpy(key,d_key,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
     /* z = y += f*c */
-    bsparseconv_gpu(d_y, d_key, &d_c,k);
+    bsparseconv_gpu(d_y, d_key, &d_c);
 
-    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)*k),cudaMemcpyDeviceToHost);
+    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
     /* No modular reduction required. */
 
     count++;
@@ -159,7 +159,7 @@ sign(unsigned char *h, int64 *z, const int64 *key,
         (long long int) c.val[c.ind[i]]);
   printf("\n");
 #endif
-  for(i=0;i<k;i++)
+  //for(i=0;i<k;i++)
   {
   memcpy(z, y, PASS_N*sizeof(int64));
   }

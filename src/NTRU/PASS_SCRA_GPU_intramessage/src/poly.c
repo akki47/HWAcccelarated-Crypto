@@ -1,5 +1,5 @@
 /*
- * CPASSREF/bsparseconv.h
+ * CPASSREF/poly.c
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,12 +19,23 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CPASSREF_BSPARSECONV_H_
-#define CPASSREF_BSPARSECONV_H_
+#include "constants.h"
+#include "pass_types.h"
+#include "poly.h"
 
 int
-bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
+poly_cmod(int64 *a)
+{
+  int64 i;
+  for (i=0; i<PASS_N; i++) {
+    if (a[i] >= 0) {
+      a[i] %= PASS_p;
+    } else {
+      a[i] = PASS_p + (a[i] % PASS_p);
+    }
+    if (a[i] > ((PASS_p-1)/2))
+      a[i] -= PASS_p;
+  }
 
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b, int k);
-
-#endif
+  return 0;
+}

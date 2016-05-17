@@ -14,7 +14,6 @@ __global__ void bsparseconv_kernel(int64 *c, const int64 *a, const b_sparse_poly
   int64 k = 0;
 
   int thread = threadIdx.x + blockDim.x*blockIdx.x;
-  int msg_count = blockIdx.x;
 
   if(thread < PASS_N)
   {
@@ -58,13 +57,14 @@ __global__ void bsparseconv_kernel(int64 *c, const int64 *a, const b_sparse_poly
 }
 
 
-extern "C" void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b, int k)
+extern "C" void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b)
 {
 	int msg_count=1;
-	unsigned int num_blocks = k ;
+	unsigned int num_blocks = msg_count ;
 	unsigned int num_threads = PASS_N;
 
 	    /* z = y += f*c */
 	bsparseconv_kernel<<<num_blocks,num_threads>>>(c, a, b);
 	    /* No modular reduction required. */
 }
+

@@ -125,7 +125,7 @@ reject(const int64 *z)
 
 int
 sign(unsigned char *h, int64 *z, const int64 *key,
-    const unsigned char *message, const int msglen, const int64 *pubkey)
+    const unsigned char *message, const int msglen, const int64 *pubkey, int k)
 {
   int count;
   b_sparse_poly c;
@@ -145,16 +145,21 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 
     mknoise(y);
     ntt(Fy, y);
-    hash(h, Fy, msg_digest);
 
-    CLEAR(c.val);
-    formatc(&c, h);
+    for( i=0;i<k;i++)
+      {
+
+        hash(h, Fy, msg_digest);
+        CLEAR(c.val);
+        formatc(&c, h);
+        circ_conv(g,key,pubkey);
+      }
 
     //Original NTRUSign protocol
 
     //generating polynomial g = f*h (move this to a seperate generate keys method because this can cause
     //problems in performance comp)
-    circ_conv(g,key,pubkey);
+
 
     int64 d_x[PASS_N];
     int64 d_y[PASS_N];
@@ -162,27 +167,27 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 	int64 d_key[PASS_N];
 	b_sparse_poly d_c;
 
-	cudaMalloc(&d_x, (PASS_N * sizeof(int64)));
-	cudaMalloc(&d_g, (PASS_N * sizeof(int64)));
-	cudaMalloc(&d_c, (sizeof(b_sparse_poly)));
-	cudaMalloc(&d_y, (PASS_N * sizeof(int64)));
+	cudaMalloc(&d_x, (PASS_N * sizeof(int64))*k);
+	cudaMalloc(&d_g, (PASS_N * sizeof(int64))*k);
+	cudaMalloc(&d_c, (sizeof(b_sparse_poly))*k);
+	cudaMalloc(&d_y, (PASS_N * sizeof(int64))*k);
 	cudaMalloc(&d_key, (PASS_N * sizeof(int64)));
 
-	cudaMemcpy(x,d_x,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
-	cudaMemcpy(&c,&d_c, sizeof(b_sparse_poly),cudaMemcpyDeviceToHost);
-	cudaMemcpy(g,d_g,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
-	cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+	cudaMemcpy(x,d_x,(PASS_N * sizeof(int64)*k),cudaMemcpyDeviceToHost);
+	cudaMemcpy(&c,&d_c, sizeof(b_sparse_poly)*k,cudaMemcpyDeviceToHost);
+	cudaMemcpy(g,d_g,(PASS_N * sizeof(int64))*k,cudaMemcpyDeviceToHost);
+	cudaMemcpy(y,d_y,(PASS_N * sizeof(int64))*k,cudaMemcpyDeviceToHost);
 	cudaMemcpy(key,d_key,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
     //bsparseconv(x,g,&c); //generating x = (-1/q)m*g
-    bsparseconv_gpu(d_x, d_g, &d_c);
-    cudaMemcpy(x,d_x,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+    bsparseconv_gpu(d_x, d_g, &d_c,k);
+    cudaMemcpy(x,d_x,(PASS_N * sizeof(int64)*k),cudaMemcpyDeviceToHost);
 
 
     /* z = y += f*c */
-    bsparseconv_gpu(d_y, d_key, &d_c);	//generating y = (1/q)m*f
+    bsparseconv_gpu(d_y, d_key, &d_c,k);	//generating y = (1/q)m*f
     /* No modular reduction required. */
 
-    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)),cudaMemcpyDeviceToHost);
+    cudaMemcpy(y,d_y,(PASS_N * sizeof(int64)*k),cudaMemcpyDeviceToHost);
 //    cudaFree(d_y);
 //    cudaFree(d_x);
 //    cudaFree(d_key);
@@ -218,8 +223,10 @@ sign(unsigned char *h, int64 *z, const int64 *key,
   printf("\n");
 #endif
 
+  for(i=0;i<k;i++)
+  {
   memcpy(z, y, PASS_N*sizeof(int64));
-
+  }
   return count;
 }
 

@@ -1,5 +1,5 @@
 /*
- * CPASSREF/bsparseconv.h
+ * CPASSREF/ntt.h
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,12 +19,27 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CPASSREF_BSPARSECONV_H_
-#define CPASSREF_BSPARSECONV_H_
+/* Dependencies:
+      constants.h pass_types.h
+*/
+
+#ifndef CPASSREF_EVAL_H_
+#define CPASSREF_EVAL_H_
+
+#define NTT_LEN (PASS_N-1)
+
+static const int64 perm[NTT_LEN+1] = {
+#include PASS_PERMUTATION
+    , 1
+  };
 
 int
-bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
+ntt_setup();
 
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b, int k);
+int
+ntt_cleanup();
+
+int
+ntt(int64 *wS, const int64 *w);
 
 #endif

@@ -24,7 +24,7 @@
 
 /* Parameters */
 #ifndef PASS_N
-#define PASS_N 1153
+#define PASS_N 433
 #endif
 
 #if PASS_N == 433

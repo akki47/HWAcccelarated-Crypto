@@ -1,5 +1,5 @@
 /*
- * CPASSREF/bsparseconv.h
+ * CPASSREF/formatc.h
  *
  *  Copyright 2013 John M. Schanck
  *
@@ -19,12 +19,10 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CPASSREF_BSPARSECONV_H_
-#define CPASSREF_BSPARSECONV_H_
+#ifndef CPASSREF_FORMATC_H_
+#define CPASSREF_FORMATC_H_
 
 int
-bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
-
-extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b, int k);
+formatc(b_sparse_poly *c, const unsigned char *digest);
 
 #endif
