@@ -199,38 +199,41 @@ void rsa_context_mp::RA_modmult_stream(const unsigned char **sigbuf, const unsig
 }
 
 
-void rsa_context_mp::RA_sign_offline(const unsigned char **m, const unsigned int *m_len,
-    			unsigned char **sigret, unsigned int *siglen, int n)
+void rsa_context_mp::RA_sign_offline(unsigned char **sigret, unsigned int *siglen)
 {
 
 	int signatureLength = get_key_bits() / 8;
 	int digestLength = SHA_DIGEST_LENGTH;
+	int n = rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks;
 
-	unsigned char digest[n][digestLength];
 	unsigned char digestPadded[n][signatureLength];
 	unsigned int digestPadded_len[n];
 
-	unsigned char *digest_arr[n];
 	unsigned char *digestPadded_arr[n];
 
 	device_context dev_ctx;
 	dev_ctx.init(n * 512 * 2.2, 0);
 	sha_context sha_ctx(&dev_ctx);
 
-	for(int i = 0;i < n; i++)
+	int buffer;
+	for(int i = 0 ; i < rsa_context::numberOfSCRAChunks; i++)
 	{
-		digest_arr[i] = digest[i];
-		digestPadded_arr[i] = digestPadded[i];
-		digestPadded_len[i] = signatureLength;
+		for(int j = 0; j < rsa_context::maximumValueOfSCRAChunk; j++)
+		{
+			memset(&buffer, 0, sizeof(buffer));
+			buffer = buffer | (i << (sizeof(int) * 8 - 5));
+			buffer = buffer | (j << (sizeof(int) * 8 - 13));
+
+			//Pad the hashed message
+			memset(digestPadded[i * rsa_context::maximumValueOfSCRAChunk + j], 0, signatureLength - 2);
+			memcpy(digestPadded[i * rsa_context::maximumValueOfSCRAChunk + j] + signatureLength - 2, &buffer, 2);
+		}
 	}
 
-	sha_ctx.calculate_sha1(m, m_len, digest_arr, n);
-
-	for(int i = 0; i < n; i++)
+	for(int i = 0;i < n; i++)
 	{
-		//Pad the hashed message
-		memset(digestPadded[i], 0, signatureLength - 20);
-		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+		digestPadded_arr[i] = digestPadded[i];
+		digestPadded_len[i] = signatureLength;
 	}
 
 	// by default, stream is not used
@@ -238,24 +241,39 @@ void rsa_context_mp::RA_sign_offline(const unsigned char **m, const unsigned int
 	sync(0);
 }
 
-void rsa_context_mp::RA_sign_online(const unsigned char **sigbuf, const unsigned int *siglen,
-		unsigned char **condensed_sig, int n, int a)
+void rsa_context_mp::RA_sign_online(const unsigned char **m, const unsigned int *m_len, const unsigned char **sigbuf,
+		const unsigned int *siglen, unsigned char **condensed_sig, int n)
 {
 
 	int success;
 	unsigned int signatureLength = get_key_bits() / 8;
 	int digestLength = SHA_DIGEST_LENGTH;
+	unsigned char digest[SHA_DIGEST_LENGTH];
 
 	unsigned char *condensedSignature_arr[n];
 	unsigned int condensedSignature_len[n];
 
-	for(int i = 0;i < n ; i++)
+	unsigned char ordered_sigs[n][signatureLength];
+	unsigned int ordered_siglen[n];
+
+	for(int i = 0; i <= n; i++)
 	{
+		//Calculate message digest.
+		CalculateMessageDigest(m[i], m_len[i], digest, SHA_DIGEST_LENGTH);
 		condensedSignature_arr[i] = condensed_sig[i];
+
+		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
+		{
+			int offset = digest[j] - '0';
+
+			ordered_sigs[i * rsa_context::numberOfSCRAChunks + j] = sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset];
+			ordered_siglen[i * rsa_context::numberOfSCRAChunks + j] = siglen[j * rsa_context::maximumValueOfSCRAChunk + offset];
+		}
+
 	}
 
-	RA_modmult_stream(sigbuf, siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, a);
-	sync(0, a);
+	RA_modmult_stream((const unsigned char **)ordered_sigs, ordered_siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, rsa_context::numberOfSCRAChunks);
+	sync(0, rsa_context::numberOfSCRAChunks);
 }
 
 int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len,

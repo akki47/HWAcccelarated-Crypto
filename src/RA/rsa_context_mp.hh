@@ -95,14 +95,12 @@ public:
 	/**
 	 * Generate RSA signatures of the given messages.
 	 *
-	 * @param m messages.
-	 * @param m_len message lengths.
 	 * @param sigbuf Signatures of the message.
 	 * @param siglen Lengths of the signature.
 	 * @param n Number of messages.
 	 */
-	virtual void RA_sign_offline(const unsigned char **m, const unsigned int *m_len,
-    			unsigned char **sigret, unsigned int *siglen, int n);
+	virtual void RA_sign_offline(unsigned char **sigret, unsigned int *siglen);
+
 
 	/**
 	 * Generate RSA signatures of the given messages.
@@ -119,17 +117,21 @@ public:
 	/**
 	 * Generate a CondensedRSA signature using signature tables.
 	 *
+	 * @param m messages.
+	 * @param m_len message lengths.
 	 * @param sigbuf Signatures of the message.
 	 * @param siglen Lengths of the signature.
 	 * @param condensed_sig Returned condensed signature.
 	 * @param n Number of messages.
 	 */
-	virtual void RA_sign_online(const unsigned char **sigbuf, const unsigned int *siglen,
-				unsigned char **condensed_sig, int n, int a);
+	virtual void RA_sign_online(const unsigned char **m, const unsigned int *m_len, const unsigned char **sigbuf,
+			const unsigned int *siglen, unsigned char **condensed_sig, int n);
 
 
 	virtual void RA_modmult_stream(const unsigned char **sigbuf, const unsigned int *siglen,
 			unsigned char **condensed_sig, unsigned int *condensed_siglen, int n, int stream_id, int a);
+
+
 	/**
 	 *  Verify the condensed signature.
 	 *
@@ -138,8 +140,8 @@ public:
 	 * @param condensed_sig Condensed signature.
 	 * @param n Number of messages.
 	 */
-	virtual int RA_verify(const unsigned char **m, const unsigned int *m_len,
-    			const unsigned char **condensed_sig, int n, int a);
+	virtual int RA_verify(const unsigned char **m, const unsigned int *m_len,const unsigned char **sigbuf,
+			const unsigned int *siglen, const unsigned char **condensed_sig, int n);
 
 	void RA_verify_stream(const unsigned char **m, const unsigned int *m_len,
 			unsigned char **sigret, unsigned int *siglen, int n, unsigned int stream_id);

@@ -2,7 +2,7 @@
 #define RSA_CONTEXT_HH
 
 #include <string>
-
+#include <stdlib.h>
 #include <openssl/rsa.h>
 
 /**
@@ -108,25 +108,24 @@ public:
 	/**
 	 * Generate RSA signatures of the given messages.
 	 *
-	 * @param m messages.
-	 * @param m_len message lengths.
 	 * @param sigbuf Signatures of the message.
 	 * @param siglen Lengths of the signature.
 	 * @param n Number of messages.
 	 */
-	virtual void RA_sign_offline(const unsigned char **m, const unsigned int *m_len,
-    			unsigned char **sigret, unsigned int *siglen, int n);
+	virtual void RA_sign_offline(unsigned char **sigret, unsigned int *siglen);
 
 	/**
 	 * Generate a CondensedRSA signature using signature tables.
 	 *
+	 * @param m messages.
+	 * @param m_len message lengths.
 	 * @param sigbuf Signatures of the message.
 	 * @param siglen Lengths of the signature.
 	 * @param condensed_sig Returned condensed signature.
 	 * @param n Number of messages.
 	 */
-	virtual void RA_sign_online(const unsigned char **sigbuf, const unsigned int *siglen,
-				unsigned char **condensed_sig, int n, int a);
+	virtual void RA_sign_online(const unsigned char **m, const unsigned int *m_len, const unsigned char **sigbuf,
+			const unsigned int *siglen, unsigned char **condensed_sig, int n);
 
 
 	/**
@@ -137,8 +136,8 @@ public:
 	 * @param condensed_sig Condensed signature.
 	 * @param n Number of messages.
 	 */
-	virtual int RA_verify(const unsigned char **m, const unsigned int *m_len,
-    			const unsigned char **condensed_sig, int n, int a);
+	virtual int RA_verify(const unsigned char **m, const unsigned int *m_len,const unsigned char **sigbuf,
+			const unsigned int *siglen, const unsigned char **condensed_sig, int n);
 
 
 	void CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
@@ -147,6 +146,10 @@ public:
 	float get_elapsed_ms_kernel();
 
 	static const int max_batch = 2048 * 8 / 2;
+
+	static const int numberOfSCRAChunks = 20;
+
+	static const int maximumValueOfSCRAChunk = 256;
 
 	RSA *rsa;
 

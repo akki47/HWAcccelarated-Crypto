@@ -17,44 +17,46 @@ int NUMTHREADS = 1;
 void *__gxx_personality_v0;
 static unsigned char ptext[rsa_context::max_batch][512];
 static unsigned int ptext_len[rsa_context::max_batch];
-static unsigned char ctext[rsa_context::max_batch][512];
-static unsigned int ctext_len[rsa_context::max_batch];
+
+static unsigned char ctext[rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks][512];
+static unsigned int ctext_len[rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks];
+
 static unsigned char condensedSignature[rsa_context::max_batch][512];
 
-unsigned char ptext_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch][512];
-unsigned int ptext_len_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
-unsigned char ctext_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch][512];
-unsigned int ctext_len_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
-unsigned char *ctext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
-unsigned char *ptext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
+//unsigned char ptext_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch][512];
+//unsigned int ptext_len_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
+//unsigned char ctext_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch][512];
+//unsigned int ctext_len_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
+//unsigned char *ctext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
+//unsigned char *ptext_arr_str[rsa_context_mp::max_stream + 1][rsa_context::max_batch];
 
 struct ThreadData {
 	rsa_context *rsa;
 	const unsigned char **m;
 	const unsigned int *m_len;
-	unsigned char **sigret;
-	unsigned int *siglen;
+	unsigned char **sig_table;
+	unsigned int *sig_len;
+	unsigned char **condensed_sig;
 	int n;
-	int numberOfComponents;
 };
 
 void* createCPUThreads_RA_sign_offline(void* td) {
 	struct ThreadData* data=(struct ThreadData*) td;
-	data->rsa->RA_sign_offline(data->m, data->m_len, data->sigret, data->siglen , data->n);
+	data->rsa->RA_sign_offline(data->sig_table, data->sig_len);
 
 	return NULL;
 }
 
 void* createCPUThreads_RA_sign_online(void* td) {
 	struct ThreadData* data=(struct ThreadData*) td;
-	data->rsa->RA_sign_online(data->m, data->m_len, data->sigret, data->n, data->numberOfComponents);
+	data->rsa->RA_sign_online(data->m, data->m_len, (const unsigned char**)data->sig_table, (const unsigned int*)data->sig_len, data->condensed_sig, data->n);
 
 	return NULL;
 }
 
 void* createCPUThreads_RA_verify(void* td) {
 	struct ThreadData* data=(struct ThreadData*) td;
-	data->rsa->RA_verify(data->m, data->m_len, (const unsigned char**)data->sigret, data->n, data->numberOfComponents);
+	data->rsa->RA_verify(data->m, data->m_len, (const unsigned char**)data->sig_table, (const unsigned int*)data->sig_len, (const unsigned char**)data->condensed_sig, data->n);
 
 	return NULL;
 }
@@ -102,11 +104,8 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 		/* Divide work for threads, prepare parameters */
 		for (int i=0; i<NUMTHREADS; i++) {
 			data[i].rsa = rsa;
-			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
-			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
-			data[i].sigret = (unsigned char **)(ctext_arr + i*tasksPerThread);
-			data[i].siglen = (unsigned int*)(ctext_len + i*tasksPerThread);
-			data[i].n = tasksPerThread;
+			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
+			data[i].sig_len = (unsigned int*)(ctext_len + i*tasksPerThread);
 		}
 
 		/* Launch Threads */
@@ -133,11 +132,12 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 		/* Divide work for threads, prepare parameters */
 		for (int i=0; i<NUMTHREADS; i++) {
 			data[i].rsa = rsa;
-			data[i].m = (const unsigned char**)(ctext_arr + i*tasksPerThread);
-			data[i].m_len = (const unsigned int*)(ctext_len + i*tasksPerThread);
-			data[i].sigret = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
+			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
+			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
+			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
+			data[i].sig_len = (unsigned int *)(ctext_len + i*tasksPerThread);
+			data[i].condensed_sig = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
 			data[i].n = tasksPerThread;
-			data[i].numberOfComponents = numberOfComponents;
 		}
 
 		/* Launch Threads */
@@ -179,9 +179,9 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 			data[i].rsa = rsa;
 			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
 			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
-			data[i].sigret = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
-			data[i].n = tasksPerThread;
-			data[i].numberOfComponents = numberOfComponents;
+			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
+			data[i].sig_len = (unsigned int *)(ctext_len + i*tasksPerThread);
+			data[i].condensed_sig = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
 		}
 
 		/* Launch Threads */
@@ -285,8 +285,8 @@ static void sign_test_latency_DynamicScheduler(rsa_context *cpu_rsa,  rsa_contex
 
 			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
 			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
-			data[i].sigret = (unsigned char **)(ctext_arr + i*tasksPerThread);
-			data[i].siglen = (unsigned int*)(ctext_len + i*tasksPerThread);
+			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
+			data[i].sig_len = (unsigned int*)(ctext_len + i*tasksPerThread);
 			data[i].n = tasksPerThread;
 		}
 
@@ -319,9 +319,8 @@ static void sign_test_latency_DynamicScheduler(rsa_context *cpu_rsa,  rsa_contex
 				data[i].rsa = cpu_rsa;
 			data[i].m = (const unsigned char**)(ctext_arr + i*tasksPerThread);
 			data[i].m_len = (const unsigned int*)(ctext_len + i*tasksPerThread);
-			data[i].sigret = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
+			data[i].sig_table = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
 			data[i].n = tasksPerThread;
-			data[i].numberOfComponents = numberOfComponents;
 		}
 
 		/* Launch Threads */
@@ -366,9 +365,8 @@ static void sign_test_latency_DynamicScheduler(rsa_context *cpu_rsa,  rsa_contex
 				data[i].rsa = cpu_rsa;
 			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
 			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
-			data[i].sigret = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
+			data[i].sig_table = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
 			data[i].n = tasksPerThread;
-			data[i].numberOfComponents = numberOfComponents;
 		}
 
 		/* Launch Threads */

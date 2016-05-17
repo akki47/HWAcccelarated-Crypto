@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstring>
+#include <stdlib.h>
 #include <sys/time.h>
 
 #include <openssl/pem.h>
@@ -167,50 +168,62 @@ void rsa_context::CalculateMessageDigest(const unsigned char *m, unsigned int m_
 }
 
 
-void rsa_context::RA_sign_offline(const unsigned char **m, const unsigned int *m_len,
-    			unsigned char **sigret, unsigned int *siglen, int n)
+void rsa_context::RA_sign_offline(unsigned char **sigret, unsigned int *siglen)
 {
 
 	int signatureLength = get_key_bits() / 8;
-	int digestLength = SHA_DIGEST_LENGTH;
 
-	unsigned char digest[n][digestLength];
-	unsigned char digestPadded[n][signatureLength];
+	unsigned char digestPadded[rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks][signatureLength];
 
-	for(int i = 0; i < n; i++)
+	//	for(int i = 0; i < n; i++)
+	//	{
+
+	int buffer;
+
+	for(int i = 0 ; i < rsa_context::numberOfSCRAChunks; i++)
 	{
-		//Calculate message digest.
-		CalculateMessageDigest(m[i], m_len[i], digest[i], digestLength);
+		for(int j = 0; j < rsa_context::maximumValueOfSCRAChunk; j++)
+		{
+			memset(&buffer, 0, sizeof(buffer));
+			buffer = buffer | (i << (sizeof(int) * 8 - 5));
+			buffer = buffer | (j << (sizeof(int) * 8 - 13));
 
-		//Pad the hashed message
-		memset(digestPadded[i], 0, signatureLength - 20);
-		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+			//Pad the hashed message
+			memset(digestPadded[i], 0, signatureLength - 2);
+			memcpy(digestPadded[i] + signatureLength - 2, &buffer, 2);
 
-		//Create signature
-		siglen[i] = RSA_private_encrypt(signatureLength, digestPadded[i], sigret[i], rsa, RSA_NO_PADDING);
+			//Create signature
+			siglen[i] = RSA_private_encrypt(signatureLength, digestPadded[i], sigret[i], rsa, RSA_NO_PADDING);
 
-		assert(siglen[i] == signatureLength);
+			assert(siglen[i] == signatureLength);
+		}
 	}
+	//	}
 
 }
 
-void rsa_context::RA_sign_online(const unsigned char **sigbuf, const unsigned int *siglen,
-		unsigned char **condensed_sig, int n, int a)
+void rsa_context::RA_sign_online(const unsigned char **m, const unsigned int *m_len,
+		const unsigned char **sigbuf, const unsigned int *siglen, unsigned char **condensed_sig, int n)
 {
 
 	int success;
 	unsigned int signatureLength = get_key_bits() / 8;
 	unsigned int condensedSignatureLength = 0;
-	int digestLength = SHA_DIGEST_LENGTH;
+	unsigned char digest[SHA_DIGEST_LENGTH];
 
-	for(int i = 0; i <= n - a; i++)
+	for(int i = 0; i <= n; i++)
 	{
 		BIGNUM *condensedSignature_bn = BN_new();
 		BN_one(condensedSignature_bn);
 
-		for(int j = 0; j < a; j++)
+		//Calculate message digest.
+		CalculateMessageDigest(m[i], m_len[i], digest, SHA_DIGEST_LENGTH);
+
+		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
 		{
-			success = BN_mod_mul(condensedSignature_bn, BN_bin2bn(sigbuf[i + j], siglen[i + j], NULL),
+			int offset = digest[j] - '0';
+
+			success = BN_mod_mul(condensedSignature_bn, BN_bin2bn(sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset], siglen[j * rsa_context::maximumValueOfSCRAChunk + offset], NULL),
 					condensedSignature_bn, rsa->n, bn_ctx);
 
 			assert(success == 1);
@@ -230,8 +243,8 @@ void rsa_context::RA_sign_online(const unsigned char **sigbuf, const unsigned in
 	}
 }
 
-int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,
-		const unsigned char **condensed_sig, int n, int a)
+int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,const unsigned char **sigbuf,
+		const unsigned int *siglen, const unsigned char **condensed_sig, int n)
 {
 	int success = 0;
 	int signatureLength = get_key_bits() / 8;
@@ -250,7 +263,7 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,
 	BIGNUM *condensedSignature_bn = BN_new();
 	BIGNUM *digest_bn = BN_new();
 
-	for(int i = 0;i <= n - a; i++)
+	for(int i = 0;i <= n; i++)
 	{
 		BN_one(digest_bn);
 		BN_zero(condensedSignature_bn);
@@ -258,9 +271,15 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,
 		BN_bin2bn(condensed_sig[i], signatureLength, condensedSignature_bn);
 		BN_mod_exp(condensedSignature_bn, condensedSignature_bn, rsa->e, rsa->n, bn_ctx);
 
-		for(int j = 0; j < a; j++)
+		int buffer;
+		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
 		{
-			success = BN_mod_mul(digest_bn, BN_bin2bn(digest[i + j], digestLength, NULL),
+			memset(&buffer, 0, sizeof(buffer));
+
+			buffer = buffer | (j << (sizeof(int) * 8 - 5));
+			buffer = buffer | (digest[i][j] << (sizeof(int) * 8 - 13));
+
+			success = BN_mod_mul(digest_bn, BN_bin2bn((const unsigned char *)&buffer, 2, NULL),
 					digest_bn, rsa->n, bn_ctx);
 			assert(success == 1);
 		}
