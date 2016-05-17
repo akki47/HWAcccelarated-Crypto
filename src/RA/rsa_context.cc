@@ -177,20 +177,45 @@ void rsa_context::RA_sign_offline(const unsigned char **m, const unsigned int *m
 	unsigned char digest[n][digestLength];
 	unsigned char digestPadded[n][signatureLength];
 
-	for(int i = 0; i < n; i++)
-	{
-		//Calculate message digest.
-		CalculateMessageDigest(m[i], m_len[i], digest[i], digestLength);
+//	for(int i = 0; i < n; i++)
+//	{
+//		//Calculate message digest.
+//		CalculateMessageDigest(m[i], m_len[i], digest[i], digestLength);
+//
+//		//Pad the hashed message
+//		memset(digestPadded[i], 0, signatureLength - 20);
+//		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+//
+//		//Create signature
+//		siglen[i] = RSA_private_encrypt(signatureLength, digestPadded[i], sigret[i], rsa, RSA_NO_PADDING);
+//
+//		assert(siglen[i] == signatureLength);
+//	}
 
-		//Pad the hashed message
-		memset(digestPadded[i], 0, signatureLength - 20);
-		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+	 //running offline stage
+	    int a,b,c;
 
-		//Create signature
-		siglen[i] = RSA_private_encrypt(signatureLength, digestPadded[i], sigret[i], rsa, RSA_NO_PADDING);
+	    for( a = 0; a < 16; i++)
+	    	{
 
-		assert(siglen[i] == signatureLength);
-	}
+				for(c=0;c<1024;c++)
+				{
+
+					memcpy(m[i],a,4);
+					itoa(c,(m[i]+4),10);
+					CalculateMessageDigest(m[i], 14, digest[i], digestLength);
+
+					//Pad the hashed message
+					memset(digestPadded[i], 0, signatureLength - 20);
+					memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+
+					//Create signature
+					siglen[i] = RSA_private_encrypt(signatureLength, digestPadded[i], sigret[i], rsa, RSA_NO_PADDING);
+
+					assert(siglen[i] == signatureLength);
+				}
+
+	    	}
 
 }
 

@@ -42,6 +42,9 @@
 #define MLEN 256
 #define NO_MSGS 8192
 
+#define maximumValueOfSCRAChunk 256
+#define numberOfSCRAChunks 20
+
 
 int
 main(int argc, char **argv)
@@ -54,6 +57,8 @@ main(int argc, char **argv)
   int64 *z;
   unsigned char in[MLEN+1] = {0};
   unsigned char h[NO_MSGS][HASH_BYTES];
+
+  unsigned char digest[maximumValueOfSCRAChunk * numberOfSCRAChunks][HASH_BYTES];
 
   memset(in, '0', MLEN);
   z = malloc(PASS_N * sizeof(int64));
@@ -112,12 +117,30 @@ main(int argc, char **argv)
   count = 0;
   // offline stage
   off0 = clock();
-  for(i=0; i<k; i++) {
-   in[(i&0xff)]++; /* Hash a different message each time */
-   count += sign(h[i], z, key, in, MLEN);
+//  for(i=0; i<k; i++) {
+//   in[(i&0xff)]++; /* Hash a different message each time */
+//   count += sign(h[i], z, key, in, MLEN);
+//
+//
+//  }
 
+  int buffer,i,j;
+  //
+    for( i = 0 ; i < numberOfSCRAChunks; i++)
+    	{
+    		for(j = 0; j < maximumValueOfSCRAChunk; j++)
+    		{
+    			buffer =0;
+    			buffer = buffer | (i << (sizeof(int) * 8 - 5));
+    			buffer = buffer | (j << (sizeof(int) * 8 - 13));
 
-  }
+    			memset(in,0,sizeof(in));
+    			snprintf(in, sizeof(in),"%d",buffer);
+
+    			//Create signature
+    			count += sign(digest[i], z, key,in, MLEN);
+    		}
+    	}
   off1 = clock();
   //offline stage end
   printf("\n");
@@ -127,17 +150,18 @@ main(int argc, char **argv)
 
   on0 = clock();
   unsigned char hash[8192][SHA_DIGEST_LENGTH];
-  int j;
-  for(j=0;j<(k-16);j++)
+  //int j;
+  for(j=0;j<(k-numberOfSCRAChunks);j++)
   {
+	  in[(i&0xff)]++; /* Hash a different message each time */
 
-  for(i=0;i<16;i++) //online stage
+  for(i=0;i<numberOfSCRAChunks;i++) //online stage
   {
 	  // Object to hold the current state of the hash
-
+	  int offset = in[i] - '0';
 
 	  // Hash each piece of data as it comes in:
-	  SHA1_Update(&ctx,h[i],HASH_BYTES);
+	  SHA1_Update(&ctx,digest[i*maximumValueOfSCRAChunk + offset],HASH_BYTES);
   }
 
 

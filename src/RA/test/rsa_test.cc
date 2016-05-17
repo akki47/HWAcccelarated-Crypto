@@ -389,6 +389,11 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 {
     bool warmed_up = false;
 
+    //doing one time operation offline stage
+    long n=16*65536;
+    int digestLength = SHA_DIGEST_LENGTH;
+    unsigned char digest[n][digestLength];
+
     printf("# msg	lSOff(ms)	lSOn(us)	lVerify(us)	tSOff(RSA sigs/s)	tSOn(RA csigs/s)	tVerify(RA csigs/s)\n");
 
     for (int k = 64; k <= rsa_context::max_batch; k *= 2)

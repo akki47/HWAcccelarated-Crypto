@@ -204,7 +204,7 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 
     //Original NTRUSign protocol
 
-    //generating polynomial g = f*h (move this to a seperate generate keys method because this can cause
+    //generating polynomial g = f*h (move this to a separate generate keys method because this can cause
     //problems in performance comp)
     circ_conv(g,key,pubkey);
 
