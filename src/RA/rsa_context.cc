@@ -172,30 +172,31 @@ void rsa_context::RA_sign_offline(unsigned char **sigret, unsigned int *siglen)
 {
 
 	int signatureLength = get_key_bits() / 8;
-
-	unsigned char digestPadded[rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks][signatureLength];
+	unsigned char digestPadded[signatureLength];
 
 	//	for(int i = 0; i < n; i++)
 	//	{
 
-	int buffer;
+	int buffer = 0;
 
 	for(int i = 0 ; i < rsa_context::numberOfSCRAChunks; i++)
 	{
 		for(int j = 0; j < rsa_context::maximumValueOfSCRAChunk; j++)
 		{
-			memset(&buffer, 0, sizeof(buffer));
+			buffer = 0;
+			memset(digestPadded, 0, sizeof(digestPadded));
+
 			buffer = buffer | (i << (sizeof(int) * 8 - 5));
 			buffer = buffer | (j << (sizeof(int) * 8 - 13));
 
 			//Pad the hashed message
-			memset(digestPadded[i], 0, signatureLength - 2);
-			memcpy(digestPadded[i] + signatureLength - 2, &buffer, 2);
+			//memset(digestPadded, 0, signatureLength - 4);
+			memcpy(digestPadded + signatureLength - 4, &buffer, 4);
 
 			//Create signature
-			siglen[i] = RSA_private_encrypt(signatureLength, digestPadded[i], sigret[i], rsa, RSA_NO_PADDING);
+			siglen[i * rsa_context::maximumValueOfSCRAChunk + j] = RSA_private_encrypt(signatureLength, digestPadded, sigret[i * rsa_context::maximumValueOfSCRAChunk + j], rsa, RSA_NO_PADDING);
 
-			assert(siglen[i] == signatureLength);
+			assert(siglen[i * rsa_context::maximumValueOfSCRAChunk + j] == signatureLength);
 		}
 	}
 	//	}
@@ -211,7 +212,7 @@ void rsa_context::RA_sign_online(const unsigned char **m, const unsigned int *m_
 	unsigned int condensedSignatureLength = 0;
 	unsigned char digest[SHA_DIGEST_LENGTH];
 
-	for(int i = 0; i <= n; i++)
+	for(int i = 0; i < n; i++)
 	{
 		BIGNUM *condensedSignature_bn = BN_new();
 		BN_one(condensedSignature_bn);
@@ -221,7 +222,7 @@ void rsa_context::RA_sign_online(const unsigned char **m, const unsigned int *m_
 
 		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
 		{
-			int offset = digest[j] - '0';
+			int offset = digest[j];
 
 			success = BN_mod_mul(condensedSignature_bn, BN_bin2bn(sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset], siglen[j * rsa_context::maximumValueOfSCRAChunk + offset], NULL),
 					condensedSignature_bn, rsa->n, bn_ctx);
@@ -230,7 +231,7 @@ void rsa_context::RA_sign_online(const unsigned char **m, const unsigned int *m_
 		}
 
 		condensedSignatureLength = BN_bn2bin(condensedSignature_bn, condensed_sig[i]);
-		assert(condensedSignatureLength != 0);
+		//assert(condensedSignatureLength != 0);
 
 		if(condensedSignatureLength < signatureLength)
 		{
@@ -250,6 +251,8 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,co
 	int signatureLength = get_key_bits() / 8;
 	int digestLength = SHA_DIGEST_LENGTH;
 
+	unsigned char digestPadded[signatureLength];
+	unsigned char x[signatureLength], y[signatureLength];
 	unsigned char digest[n][digestLength];
 
 	for(int i = 0; i < n; i++)
@@ -263,7 +266,7 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,co
 	BIGNUM *condensedSignature_bn = BN_new();
 	BIGNUM *digest_bn = BN_new();
 
-	for(int i = 0;i <= n; i++)
+	for(int i = 0;i < n; i++)
 	{
 		BN_one(digest_bn);
 		BN_zero(condensedSignature_bn);
@@ -274,15 +277,25 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,co
 		int buffer;
 		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
 		{
+			int offset = digest[i][j];
+
 			memset(&buffer, 0, sizeof(buffer));
+			memset(digestPadded, 0, sizeof(digestPadded));
 
 			buffer = buffer | (j << (sizeof(int) * 8 - 5));
-			buffer = buffer | (digest[i][j] << (sizeof(int) * 8 - 13));
+			buffer = buffer | (offset << (sizeof(int) * 8 - 13));
 
-			success = BN_mod_mul(digest_bn, BN_bin2bn((const unsigned char *)&buffer, 2, NULL),
+			memcpy(digestPadded + signatureLength - 4, &buffer, 4);
+
+			success = BN_mod_mul(digest_bn, BN_bin2bn(digestPadded, sizeof(digestPadded), NULL),
 					digest_bn, rsa->n, bn_ctx);
 			assert(success == 1);
 		}
+
+		int condensedSignatureLength = 0;
+
+		condensedSignatureLength = BN_bn2bin(condensedSignature_bn, x);
+		condensedSignatureLength = BN_bn2bin(digest_bn, y);
 
 		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
 	}

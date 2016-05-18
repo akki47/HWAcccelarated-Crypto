@@ -69,11 +69,11 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 
 	for (int k = 64; k <= rsa_context::max_batch; k *= 2)
 	{
-		unsigned char *ptext_arr[rsa_context::max_batch];
-		unsigned char *ctext_arr[rsa_context::max_batch];
-		unsigned char *condensedSignature_arr[rsa_context::max_batch];
-		struct ThreadData data[NUMTHREADS];
-		pthread_t thread[NUMTHREADS];
+		unsigned char *ptext_arr[k];
+		unsigned char *ctext_arr[rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks];
+		unsigned char *condensedSignature_arr[k];
+		//struct ThreadData data[NUMTHREADS];
+		//pthread_t thread[NUMTHREADS];
 
 		uint64_t beginSignOffline;
 		uint64_t endSignOffline;
@@ -85,42 +85,39 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 		for (int i = 0; i < k; i++)
 		{
 			ptext_len[i] = signature_len / 8;
-			ctext_len[i] = signature_len / 8;
-
 			set_random(ptext[i], ptext_len[i]);
 
 			ptext_arr[i] = ptext[i];
-			ctext_arr[i] = ctext[i];
-
-			//if(i <= k - numberOfComponents)
-			//{
 			condensedSignature_arr[i] = condensedSignature[i];
-			// }
 		}
-		int tasksPerThread=(k + NUMTHREADS-1)/NUMTHREADS;
+
+		for(int i = 0; i < rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks; i++)
+		{
+			ctext_arr[i] = ctext[i];
+			ctext_len[i] = signature_len / 8;
+		}
+		//int tasksPerThread=(k + NUMTHREADS-1)/NUMTHREADS;
 
 		beginSignOffline = get_usec();
 
-		/* Divide work for threads, prepare parameters */
-		for (int i=0; i<NUMTHREADS; i++) {
-			data[i].rsa = rsa;
-			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
-			data[i].sig_len = (unsigned int*)(ctext_len + i*tasksPerThread);
-		}
+//		/* Divide work for threads, prepare parameters */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			data[i].rsa = rsa;
+//			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
+//			data[i].sig_len = (unsigned int*)(ctext_len + i*tasksPerThread);
+//		}
+//
+//		/* Launch Threads */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			pthread_create(&thread[i], NULL, createCPUThreads_RA_sign_offline, &data[i]);
+//		}
+//
+//		/* Wait for Threads to Finish */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			pthread_join(thread[i], NULL);
+//		}
 
-		/* Launch Threads */
-		for (int i=0; i<NUMTHREADS; i++) {
-			pthread_create(&thread[i], NULL, createCPUThreads_RA_sign_offline, &data[i]);
-		}
-
-		/* Wait for Threads to Finish */
-		for (int i=0; i<NUMTHREADS; i++) {
-			pthread_join(thread[i], NULL);
-		}
-
-		//		rsa->RA_sign_offline((const unsigned char**)ptext_arr, (const unsigned int*)ptext_len,
-		//				(unsigned char **)ctext_arr, (unsigned int*)ctext_len ,
-		//				k);
+		rsa->RA_sign_offline((unsigned char **)ctext_arr, (unsigned int*)ctext_len);
 
 		endSignOffline = get_usec();
 
@@ -129,29 +126,29 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 		beginSignOnline = get_usec();
 		try_moreSign:
 
-		/* Divide work for threads, prepare parameters */
-		for (int i=0; i<NUMTHREADS; i++) {
-			data[i].rsa = rsa;
-			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
-			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
-			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
-			data[i].sig_len = (unsigned int *)(ctext_len + i*tasksPerThread);
-			data[i].condensed_sig = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
-			data[i].n = tasksPerThread;
-		}
+//		/* Divide work for threads, prepare parameters */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			data[i].rsa = rsa;
+//			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
+//			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
+//			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
+//			data[i].sig_len = (unsigned int *)(ctext_len + i*tasksPerThread);
+//			data[i].condensed_sig = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
+//			data[i].n = tasksPerThread;
+//		}
+//
+//		/* Launch Threads */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			pthread_create(&thread[i], NULL, createCPUThreads_RA_sign_offline, &data[i]);
+//		}
+//
+//		/* Wait for Threads to Finish */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			pthread_join(thread[i], NULL);
+//		}
 
-		/* Launch Threads */
-		for (int i=0; i<NUMTHREADS; i++) {
-			pthread_create(&thread[i], NULL, createCPUThreads_RA_sign_offline, &data[i]);
-		}
-
-		/* Wait for Threads to Finish */
-		for (int i=0; i<NUMTHREADS; i++) {
-			pthread_join(thread[i], NULL);
-		}
-
-		//rsa->RA_sign_online((const unsigned char **)ctext_arr, (const unsigned int*)ctext_len,
-		//		(unsigned char **)condensedSignature_arr, k, numberOfComponents);
+		rsa->RA_sign_online((const unsigned char**)ptext_arr, (const unsigned int*)ptext_len, (const unsigned char **)ctext_arr, (const unsigned int*)ctext_len,
+				(unsigned char **)condensedSignature_arr, k);
 
 		endSignOnline = get_usec();
 		if (iterationSign < 25)
@@ -174,28 +171,28 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 		beginVerify = get_usec();
 		try_moreVerify:
 
-		/* Divide work for threads, prepare parameters */
-		for (int i=0; i<NUMTHREADS; i++) {
-			data[i].rsa = rsa;
-			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
-			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
-			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
-			data[i].sig_len = (unsigned int *)(ctext_len + i*tasksPerThread);
-			data[i].condensed_sig = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
-		}
+//		/* Divide work for threads, prepare parameters */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			data[i].rsa = rsa;
+//			data[i].m = (const unsigned char**)(ptext_arr + i*tasksPerThread);
+//			data[i].m_len = (const unsigned int*)(ptext_len + i*tasksPerThread);
+//			data[i].sig_table = (unsigned char **)(ctext_arr + i*tasksPerThread);
+//			data[i].sig_len = (unsigned int *)(ctext_len + i*tasksPerThread);
+//			data[i].condensed_sig = (unsigned char **)(condensedSignature_arr + i*tasksPerThread);
+//		}
+//
+//		/* Launch Threads */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			pthread_create(&thread[i], NULL, createCPUThreads_RA_sign_offline, &data[i]);
+//		}
+//
+//		/* Wait for Threads to Finish */
+//		for (int i=0; i<NUMTHREADS; i++) {
+//			pthread_join(thread[i], NULL);
+//		}
 
-		/* Launch Threads */
-		for (int i=0; i<NUMTHREADS; i++) {
-			pthread_create(&thread[i], NULL, createCPUThreads_RA_sign_offline, &data[i]);
-		}
-
-		/* Wait for Threads to Finish */
-		for (int i=0; i<NUMTHREADS; i++) {
-			pthread_join(thread[i], NULL);
-		}
-
-		//rsa->RA_verify((const unsigned char**)ptext_arr, (const unsigned int*)ptext_len,
-		//		(const unsigned char**)condensedSignature_arr, k, numberOfComponents);
+		rsa->RA_verify((const unsigned char**)ptext_arr, (const unsigned int*)ptext_len, (const unsigned char **)ctext_arr, (const unsigned int*)ctext_len,
+				(const unsigned char**)condensedSignature_arr, k);
 
 		endVerify = get_usec();
 		if (iterationVerify < 25)

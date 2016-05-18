@@ -266,8 +266,8 @@ void rsa_context_mp::RA_sign_online(const unsigned char **m, const unsigned int 
 		{
 			int offset = digest[j] - '0';
 
-			ordered_sigs[i * rsa_context::numberOfSCRAChunks + j] = sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset];
-			ordered_siglen[i * rsa_context::numberOfSCRAChunks + j] = siglen[j * rsa_context::maximumValueOfSCRAChunk + offset];
+			//ordered_sigs[i * rsa_context::numberOfSCRAChunks + j] = sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset];
+			//ordered_siglen[i * rsa_context::numberOfSCRAChunks + j] = siglen[j * rsa_context::maximumValueOfSCRAChunk + offset];
 		}
 
 	}
@@ -276,8 +276,8 @@ void rsa_context_mp::RA_sign_online(const unsigned char **m, const unsigned int 
 	sync(0, rsa_context::numberOfSCRAChunks);
 }
 
-int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len,
-		const unsigned char **condensed_sig, int n, int a)
+int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len,const unsigned char **sigbuf,
+		const unsigned int *siglen, const unsigned char **condensed_sig, int n)
 {
 	int success = 0;
 	unsigned int signatureLength = get_key_bits() / 8;
@@ -286,24 +286,13 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 	unsigned char digestPadded[n][signatureLength];
 
 	unsigned char *digest_arr[n];
-	const unsigned char *condensed_sig_arr[n - a];
+	const unsigned char *condensed_sig_arr[n - rsa_context::numberOfSCRAChunks];
 	unsigned char *returned_condensed_sig_arr[n];
 	unsigned char *multipliedDigest_arr[n];
 
 	unsigned int digestLength[n];
 	unsigned int multipliedHashLength[n];
 	unsigned int returned_condensed_sigLength[n];
-
-//	for(int i = 0;i < n; i++)
-//	{
-//		digest_arr[i] = digest[i];
-//	}
-
-//	//Calculate SHA Hashes in GPU
-//	device_context dev_ctx;
-//	dev_ctx.init(n * 512 * 2.2, 0);
-//	sha_context sha_ctx(&dev_ctx);
-//	sha_ctx.calculate_sha1(m, m_len, digest_arr, n);
 
 	for(int i = 0; i < n; i++)
 	{
@@ -317,28 +306,24 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
 	}
 
-	RA_modmult_stream((const unsigned char **)digest_arr, (const unsigned int *)digestLength, multipliedDigest_arr, multipliedHashLength, n , 0, a);
-	sync(0, a);
+	RA_modmult_stream((const unsigned char **)digest_arr, (const unsigned int *)digestLength, multipliedDigest_arr, multipliedHashLength, n , 0, rsa_context::numberOfSCRAChunks);
+	sync(0, rsa_context::numberOfSCRAChunks);
 
 	BIGNUM *digest_bn = BN_new();
 	BIGNUM *condensedSignature_bn = BN_new();
 
-	for(int i = 0; i < n - a; i++)
+	for(int i = 0; i < n - rsa_context::numberOfSCRAChunks; i++)
 	{
 		condensed_sig_arr[i] = condensed_sig[i];
 		returned_condensed_sig_arr[i] = returned_condensed_sigs[i];
 	}
 
-	RA_verify_stream((const unsigned char **)condensed_sig_arr, (const unsigned int *)digestLength, returned_condensed_sig_arr, returned_condensed_sigLength, n - a, 0);
+	RA_verify_stream((const unsigned char **)condensed_sig_arr, (const unsigned int *)digestLength, returned_condensed_sig_arr, returned_condensed_sigLength, n - rsa_context::numberOfSCRAChunks, 0);
 	sync(0);
 
 	int x;
-	for(int i = 0;i < n - a ; i++)
+	for(int i = 0;i < n - rsa_context::numberOfSCRAChunks ; i++)
 	{
-//		BN_bin2bn(returned_condensed_sigs[i], signatureLength, condensedSignature_bn);
-//		BN_bin2bn(multipliedDigest[i], multipliedHashLength[i], digest_bn);
-//
-//		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
 		x = memcmp(returned_condensed_sigs[i],multipliedDigest[i],signatureLength);
 		assert(x==0);
 	}
