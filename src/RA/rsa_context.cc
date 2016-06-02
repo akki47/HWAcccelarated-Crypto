@@ -153,16 +153,16 @@ void rsa_context::priv_decrypt_batch(unsigned char **out, unsigned int *out_len,
 void rsa_context::CalculateMessageDigest(const unsigned char *m, unsigned int m_len,
 		unsigned char *digest, unsigned int digestlen)
 {
-		SHA_CTX sha_ctx = { 0 };
+		SHA256_CTX sha_ctx = { 0 };
 		int rc = 1;
 
-	    rc = SHA1_Init(&sha_ctx);
+	    rc = SHA256_Init(&sha_ctx);
 	    assert(rc ==1);
 
-	    rc = SHA1_Update(&sha_ctx, m, m_len);
+	    rc = SHA256_Update(&sha_ctx, m, m_len);
 	    assert(rc ==1);
 
-	    rc = SHA1_Final(digest, &sha_ctx);
+	    rc = SHA256_Final(digest, &sha_ctx);
 	    assert(rc ==1);
 
 }
@@ -210,7 +210,7 @@ void rsa_context::RA_sign_online(const unsigned char **m, const unsigned int *m_
 	int success;
 	unsigned int signatureLength = get_key_bits() / 8;
 	unsigned int condensedSignatureLength = 0;
-	unsigned char digest[SHA_DIGEST_LENGTH];
+	unsigned char digest[SHA256_DIGEST_LENGTH];
 
 	for(int i = 0; i < n; i++)
 	{
@@ -218,7 +218,7 @@ void rsa_context::RA_sign_online(const unsigned char **m, const unsigned int *m_
 		BN_one(condensedSignature_bn);
 
 		//Calculate message digest.
-		CalculateMessageDigest(m[i], m_len[i], digest, SHA_DIGEST_LENGTH);
+		CalculateMessageDigest(m[i], m_len[i], digest, SHA256_DIGEST_LENGTH);
 
 		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
 		{
@@ -249,7 +249,7 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,co
 {
 	int success = 0;
 	int signatureLength = get_key_bits() / 8;
-	int digestLength = SHA_DIGEST_LENGTH;
+	int digestLength = SHA256_DIGEST_LENGTH;
 
 	unsigned char digestPadded[signatureLength];
 	unsigned char x[signatureLength], y[signatureLength];

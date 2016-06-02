@@ -147,7 +147,7 @@ public:
 
 	static const int max_batch = 2048 * 8 / 2;
 
-	static const int numberOfSCRAChunks = 20;
+	static const int numberOfSCRAChunks = 32;
 
 	static const int maximumValueOfSCRAChunk = 256;
 
