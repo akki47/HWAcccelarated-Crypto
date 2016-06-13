@@ -42,6 +42,9 @@
 #define MLEN 256
 #define NO_MSGS 8192
 
+#define maximumValueOfSCRAChunk 256
+#define numberOfSCRAChunks 20
+
 int
 main(int argc, char **argv)
 {
@@ -53,6 +56,8 @@ main(int argc, char **argv)
   int64 *z;
   unsigned char in[MLEN+1] = {0};
   unsigned char h[NO_MSGS][HASH_BYTES];
+
+  unsigned char digest[maximumValueOfSCRAChunk * numberOfSCRAChunks][HASH_BYTES];
 
   memset(in, '0', MLEN);
   z = malloc(PASS_N * sizeof(int64));
@@ -90,6 +95,7 @@ main(int argc, char **argv)
   gen_pubkey(pubkey, key);
 #endif
 
+  int trials;
 
   printf("\n#msg \t without SCRA \t Offline Stage \t Online Stage \t Verify Stage \t With SCRA");
 	
@@ -98,7 +104,9 @@ main(int argc, char **argv)
   {
   clock_t c0,c1,off0,off1,on0,on1,ver1,ver0;
   c0 = clock();
-
+  trials=0;
+  while(trials < 10)
+  {
   for(i=0; i<k; i++) {
      in[(i&0xff)]++; /* Hash a different message each time */
      count += sign(h[i], z, key, in, MLEN,1);
@@ -107,6 +115,8 @@ main(int argc, char **argv)
    #endif
 
     }
+  trials++;
+  }
   c1 = clock();
 
 
@@ -115,47 +125,74 @@ main(int argc, char **argv)
 
   // offline stage
   off0 = clock();
+  trials=0;
+   while(trials < 10)
+   {
   //for(i=0; i<k; i++) {
-     in[(i&0xff)]++; /* Hash a different message each time */
-     count += sign(h[i], z, key, in, MLEN, k);
-
-
+    // in[(i&0xff)]++; /* Hash a different message each time */
+    // count += sign(h[i], z, key, in, MLEN, k);
    // }
+     int buffer,i,j;
+     			//
+	for( i = 0 ; i < numberOfSCRAChunks; i++)
+	{
+		for(j = 0; j < maximumValueOfSCRAChunk; j++)
+		{
+			buffer =0;
+			buffer = buffer | (i << (sizeof(int) * 8 - 5));
+			buffer = buffer | (j << (sizeof(int) * 8 - 13));
+
+			memset(in,0,sizeof(in));
+			snprintf(in, sizeof(in),"%d",buffer);
+			//Create signature
+		}
+	}
+
+	count += sign(digest[i], z, key,in, MLEN,(numberOfSCRAChunks*maximumValueOfSCRAChunk));
+   trials++;
+   }
   off1 = clock();
   //offline stage end
   printf("\n");
 
   //online stage start
+  SHA_CTX ctx;
+     SHA1_Init(&ctx);
 
-
+     unsigned char hash[8192][SHA_DIGEST_LENGTH];
     on0 = clock();
-    SHA_CTX ctx;
-    SHA1_Init(&ctx);
+    trials=0;
+     while(trials < 10)
+     {
 
-    unsigned char hash[8192][SHA_DIGEST_LENGTH];
+
+
     int j;
-    for(j=0;j<(k-16);j++)
+    for(j=0;j<(k-numberOfSCRAChunks);j++)
     {
 
-    for(i=0;i<16;i++) //online stage
+    for(i=0;i<numberOfSCRAChunks;i++) //online stage
     {
-  	  // Object to hold the current state of the hash
+    	// Object to hold the current state of the hash
+		int offset = in[i] - '0';
 
-
-  	  // Hash each piece of data as it comes in:
-  	  SHA1_Update(&ctx,h[i],HASH_BYTES);
+		// Hash each piece of data as it comes in:
+		SHA1_Update(&ctx,digest[i*maximumValueOfSCRAChunk + offset],HASH_BYTES);
     }
 
 
      SHA1_Final(hash[j], &ctx);
     }
-
-
+    	trials++;
+     }
   on1 = clock();
    //online stage end
 
   //verify stage
    ver0 = clock();
+   trials=0;
+    while(trials < 10)
+    {
   SHA_CTX ctx2;
   SHA1_Init(&ctx2);
 
@@ -167,6 +204,7 @@ main(int argc, char **argv)
   }
 
   unsigned char hash_verify[8192][SHA_DIGEST_LENGTH];
+  int j;
   for(j=0;j<(k-16);j++)
   {
   for(i=0;i<16;i++)
@@ -189,6 +227,8 @@ main(int argc, char **argv)
 	   exit(1);
    }
   }
+  trials++;
+    }
    ver1 = clock();
   //verify stage end
 
@@ -204,9 +244,9 @@ main(int argc, char **argv)
   //printf("Time taken by Offline Stage: %fs\n", (float) (off1 - off0)/(CLOCKS_PER_SEC));
   //printf("Time taken by Online Stage:: %fs\n", (float) (on1 - on0)/(CLOCKS_PER_SEC));
   //printf("Time taken by Verify Stage:: %fs\n", (float) (ver1 - ver0)/(CLOCKS_PER_SEC));
-   ver = (float) (ver1 - ver0)/(CLOCKS_PER_SEC);
-   on = (float) (on1 - on0)/(CLOCKS_PER_SEC);
-   printf("\n%4d\t\t%.5f\t\t%.5f\t\t%.5f\t\t%.5f\t\t%.5f\t\t\n",k,(float) (c1 - c0)/(CLOCKS_PER_SEC),(float) (off1 - off0)/(CLOCKS_PER_SEC),(float) (on1 - on0)/(CLOCKS_PER_SEC),(float) (ver1 - ver0)/(CLOCKS_PER_SEC), (on+ver));
+   ver = (((float) (ver1 - ver0)/(CLOCKS_PER_SEC))/k)/trials;
+   on = (((float) (on1 - on0)/(CLOCKS_PER_SEC))/k)/trials;
+   printf("\n%4d\t\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t\n",k,(((float) (c1 - c0)/(CLOCKS_PER_SEC))/k)/trials,((float) (off1 - off0)/(CLOCKS_PER_SEC))/trials,on,ver, (on+ver));
   }
 #if DEBUG
   printf("\n\nKey: ");

@@ -99,7 +99,7 @@ sign(unsigned char *h, int64 *z, const int64 *key,
   crypto_hash_sha512(msg_digest, message, msglen);
 
   count = 0;
-  //do {
+  do {
     CLEAR(Fy);
 
     mknoise(y);
@@ -114,7 +114,7 @@ sign(unsigned char *h, int64 *z, const int64 *key,
     /* No modular reduction required. */
 
     count++;
-  //} while (reject(y));
+  } while (reject(y));
 
 #if DEBUG
   int i;
