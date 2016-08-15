@@ -143,12 +143,18 @@ sign(unsigned char *h, int64 *z, const int64 *key,
   //do {
     CLEAR(Fy);
 
+   // mknoise(y);
+   // ntt(Fy, y);
+    
     mknoise(y);
-    ntt(Fy, y);
+   // ntt_gpu(Fy,y,k);	
+    		
 
     for( i=0;i<k;i++)
       {
 
+//	mknoise(y);
+    	ntt(Fy, y);
         hash(h, Fy, msg_digest);
         CLEAR(c.val);
         formatc(&c, h);

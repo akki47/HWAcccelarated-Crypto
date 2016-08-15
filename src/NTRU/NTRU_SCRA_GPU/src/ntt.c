@@ -27,6 +27,7 @@
 #include <complex.h>
 #include <math.h>
 #include <fftw3.h>
+//#include <cufftw.h>
 #endif
 
 #include "constants.h"
@@ -112,18 +113,20 @@ int
 ntt(int64 *Ff, const int64 *f)
 {
   int i;
-
+  printf("\nUsing ntt correctly\n");	
   for(i=0; i<NTT_LEN; i++){
     dpoly[i] = (fftw_real) f[perm[i]];
   }
 
   fftw_execute(DFT); /* dpoly -> cpoly */
+  //cufftExecC2C(DFT);
 
   for(i=0;i<(NTT_LEN/2)+1; i++){
     cpoly[i] *= nth_roots_dft[i];
   }
 
   fftw_execute(iDFT); /* cpoly -> dpoly */
+  //cufftExecC2C(iDFT); 
 
   for(i=0; i<NTT_LEN; i++) {
     Ff[perm[NTT_LEN-i]] = f[0] + llrint(dpoly[i]/NTT_LEN);
@@ -166,6 +169,8 @@ int64 nth_roots[NTT_LEN] = {
    * order and just perform permutation when publishing z or extracting
    * coefficients.
    */
+
+  //printf("\nUsing incorrect ntt\n"); 	
 
   for (i = 0; i < NTT_LEN; i++) {
     Fw[perm[i]] += w[0]; /* Each coefficient of Fw gets a w[0] contribution */

@@ -42,7 +42,6 @@
 #define MLEN 256
 #define NO_MSGS 8192
 
-
 int
 main(int argc, char **argv)
 {

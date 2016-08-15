@@ -27,5 +27,7 @@ bsparseconv(int64 *c, const int64 *a, const b_sparse_poly *b);
 
 extern void bsparseconv_gpu(int64 *c, const int64 *a, const b_sparse_poly *b, int k);
 
+extern  int ntt_gpu(int64 *Fw, const int64 *w, int k);
+
 
 #endif

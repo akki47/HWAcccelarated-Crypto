@@ -106,6 +106,7 @@ CFLAGS += -c
 #CFLAGS += -O3 -ffast-math -mtune=native -malign-double
 
 LDFLAGS = -lfftw3 -lm -L$(CUDA_LIB_PATH) -lcudart -lcrypto
+#LDFLAGS = -lfftw3 -lm -L$(CUDA_LIB_PATH) -lcudart -lcrypto -lcufft
 
 SOURCES=$(wildcard *.c)  
 CU_SRC_FILES = $(wildcard *.cu) #change
