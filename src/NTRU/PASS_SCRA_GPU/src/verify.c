@@ -17,7 +17,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 #include <string.h>
 
@@ -29,43 +29,89 @@
 #include "ntt.h"
 #include "pass.h"
 
+#include </usr/local/cuda-6.5/include/cuda.h>
+#include </usr/local/cuda-6.5/include/cuda_runtime.h>
 
 #define CLEAR(f) memset((f), 0, PASS_N*sizeof(int64))
 
 int
 verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
-    const unsigned char *message, const int msglen)
+		const unsigned char *message, const int msglen, int k)
 {
-  int i;
-  b_sparse_poly c;
-  int64 Fc[PASS_N] = {0};
-  int64 Fz[PASS_N] = {0};
-  unsigned char msg_digest[HASH_BYTES];
-  unsigned char h2[HASH_BYTES];
+	int i,counter=0;
+	b_sparse_poly c;
 
-  if(reject(z))
-    return INVALID;
+	int64 *Fz = malloc(PASS_N * sizeof(int64)*k);
+	int64 *Fc = malloc(PASS_N * sizeof(int64)*k);
+	//int64 *z = malloc(PASS_N * sizeof(int64)*k);
 
-  CLEAR(c.val);
-  formatc(&c, h);
+	//int64 Fc[PASS_N] = {0};
+	//int64 Fz[PASS_N] = {0};
+	int64 c_val[PASS_N] = {0};
+	unsigned char msg_digest[HASH_BYTES];
+	unsigned char h2[HASH_BYTES];
 
-  ntt(Fc, c.val);
-  ntt(Fz, z);
+	for(i=0;i<k;i++)
+	{
+		if(reject(z))
+			counter++;
+		//return INVALID;
 
-  for(i=0; i<PASS_t; i++) {
-    Fz[S[i]] -= Fc[S[i]] * pubkey[S[i]];
-  }
+		CLEAR(c.val);
+		formatc(&c, h);
+	}
 
-  poly_cmod(Fz);
+	for(i=0;i<PASS_N;i++)
+	{
+		c_val[i]= c.val[i];
+	}
 
-  crypto_hash_sha512(msg_digest, message, msglen);
-  hash(h2, Fz, msg_digest);
 
-  for(i=0; i<HASH_BYTES; i++) {
-    if(h2[i] != h[i])
-      return INVALID;
-  }
+	int64 *d_Fz = malloc(PASS_N * sizeof(int64)*k);
+	int64 *d_Fc = malloc(PASS_N * sizeof(int64)*k);
+	int64 *d_z = malloc(PASS_N * sizeof(int64)*k);
+	int64 *d_c_val = malloc(PASS_N * sizeof(int64)*k);
 
-  return VALID;
+	cudaMalloc(&d_Fz, (PASS_N * sizeof(int64))*k);
+	cudaMalloc(&d_Fc, (PASS_N * sizeof(int64))*k);
+	cudaMalloc(&d_z, (PASS_N * sizeof(int64))*k);
+	cudaMalloc(&d_c_val, (PASS_N * sizeof(int64))*k);
+
+	cudaMemcpy(d_Fz,Fz,(PASS_N * sizeof(int64))*k,cudaMemcpyHostToDevice);
+	cudaMemcpy(d_Fc,Fc,(PASS_N * sizeof(int64))*k,cudaMemcpyHostToDevice);
+	cudaMemcpy(d_z,z,(PASS_N * sizeof(int64))*k,cudaMemcpyHostToDevice);
+	cudaMemcpy(d_c_val,c_val,(PASS_N * sizeof(int64))*k,cudaMemcpyHostToDevice);
+
+	ntt_gpu(d_Fc, d_c_val,k);
+	ntt_gpu(d_Fz, d_z,k);
+
+	cudaMemcpy(Fz,d_Fz,(PASS_N * sizeof(int64)*k),cudaMemcpyDeviceToHost);
+	cudaMemcpy(Fc,d_Fc,(PASS_N * sizeof(int64)*k),cudaMemcpyDeviceToHost);
+	cudaMemcpy(z,d_z,(PASS_N * sizeof(int64)*k),cudaMemcpyDeviceToHost);
+
+
+	for(int m=0;m<k;m++)
+	{
+		for(i=0; i<PASS_t; i++) {
+			Fz[S[i]] -= Fc[S[i]] * pubkey[S[i]];
+		}
+
+		poly_cmod(Fz);
+
+		crypto_hash_sha512(msg_digest, message, msglen);
+		hash(h2, Fz, msg_digest);
+
+		for(int j=0; j<HASH_BYTES; j++) {
+			if(h2[j] != h[j])
+				counter++;
+			//return INVALID;
+		}
+
+	}
+
+
+
+	return VALID;
+
 }
 

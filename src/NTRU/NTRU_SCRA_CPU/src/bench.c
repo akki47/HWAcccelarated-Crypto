@@ -43,7 +43,7 @@
 #define NO_MSGS 8192
 
 #define maximumValueOfSCRAChunk 256
-#define numberOfSCRAChunks 20
+#define numberOfSCRAChunks 16
 
 
 int
@@ -99,7 +99,7 @@ main(int argc, char **argv)
 	int k;
 	printf("\n#msg \t without SCRA sign \t without SCRA verify \t Offline Stage \t Online Stage \t Verify Stage \t With SCRA");
 
-	for(k=32;k< NO_MSGS; k=k*2)
+	for(k=8;k< NO_MSGS; k=k*2)
 	{
 		clock_t c0,c1,off0,off1,on0,on1,ver1,ver0,wsig0,wsig1,wver0,wver1;
 		c0 = clock();
@@ -243,7 +243,7 @@ main(int argc, char **argv)
 		//verify stage end
 
 
-
+		trials=10;
 		//printf("\nCPU\n");
 		//printf("Total attempts: %d\n",  count);
 #if VERIFY
@@ -254,9 +254,9 @@ main(int argc, char **argv)
 		//printf("Time taken by Offline Stage: %fs\n", (float) (off1 - off0)/(CLOCKS_PER_SEC));
 		//printf("Time taken by Online Stage:: %fs\n", (float) (on1 - on0)/(CLOCKS_PER_SEC));
 		//printf("Time taken by Verify Stage:: %fs\n", (float) (ver1 - ver0)/(CLOCKS_PER_SEC));
-		ver = (((float)(ver1 - ver0)/(CLOCKS_PER_SEC))/(k-numberOfSCRAChunks))/trials;
-		on = (((float)(on1 - on0)/(CLOCKS_PER_SEC))/(k-numberOfSCRAChunks))/trials;
-		printf("\n%4d\t\t%.10ft\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t\n",k,(((float) (wsig1 - wsig0)/(CLOCKS_PER_SEC))/k)/trials,(((float) (wver1 - wver0)/(CLOCKS_PER_SEC))/k)/trials,(((float) (off1 - off0)/(CLOCKS_PER_SEC)))/trials,on,ver, (on+ver));
+		ver = (float) (ver1 - ver0)/(CLOCKS_PER_SEC);
+		on = (float) (on1 - on0)/(CLOCKS_PER_SEC);
+		printf("\n%4d\t\t%.10ft\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t\n",k,(((float) (wsig1 - wsig0)/(CLOCKS_PER_SEC)))/trials,(((float) (wver1 - wver0)/(CLOCKS_PER_SEC)))/trials,(((float) (off1 - off0)/(CLOCKS_PER_SEC)))/trials,on/trials,ver/trials, (on+ver)/trials);
 	}
 #if DEBUG
 	printf("\n\nKey: ");

@@ -143,3 +143,49 @@ extern "C" int ntt_gpu(int64 *Fw, const int64 *w, int k)
    return 1;	
 }
 
+__global__ void circ_conv_kernel(int64 *c, const int64 *a, const int64 *b)
+{
+	 int i,j,k;
+		 c[0]=0;
+		 int64 d[PASS_N];
+		 int64 x2[PASS_N];
+
+		 d[0]=b[0];
+
+		for(j=1;j<PASS_N;j++)            /*folding h(n) to h(-n)*/
+			d[j]=b[PASS_N -j];
+
+		 for(i=0;i<PASS_N;i++)
+			 c[0] += a[i]*d[i];
+
+		for(k=1;k<PASS_N;k++)
+		{
+					c[k]=0;
+					/*circular shift*/
+
+					for(j=1;j<PASS_N;j++)
+						x2[j]=d[j-1];
+					x2[0]=d[PASS_N-1];
+					for(i=0;i<PASS_N;i++)
+					{
+								d[i]=x2[i];
+								c[k]+=a[i]*x2[i];
+					}
+					c[k] = c[k]/PASS_b; //this should be q, check again (might be source of error)
+		}
+
+}
+
+extern "C" int circ_conv_gpu(int64 *c, const int64 *a, const int64 *b,int k)
+{
+	unsigned int num_blocks=1;
+    unsigned int num_threads = k ;
+
+			/* z = y += f*c */
+    circ_conv_kernel<<<num_blocks,num_threads>>>(c,a,b);
+    return 1;
+
+}
+
+
+

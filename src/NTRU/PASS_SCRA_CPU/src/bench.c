@@ -213,9 +213,9 @@ main(int argc, char **argv)
 
 			for(i=0;i<k;i++)
 			{
-#if VERIFY
+//#if VERIFY
 				nbver2 += (VALID == verify(h[i], z, pubkey, in, MLEN));
-#endif
+//#endif
 			}
 
 			unsigned char hash_verify[8192][SHA256_DIGEST_LENGTH];
@@ -257,11 +257,11 @@ main(int argc, char **argv)
 		//printf("Attempts/sig: %f\n",  (((float)count)/TRIALS));
 		//printf("Time/sig: %fs\n", (float) (c1 - c0)/(CLOCKS_PER_SEC));
 		//printf("Time taken by Offline Stage: %fs\n", (float) (off1 - off0)/(CLOCKS_PER_SEC));
-		//printf("Time taken by Online Stage:: %fs\n", (float) (on1 - on0)/(CLOCKS_PER_SEC));
+		//printf("Time taken by Online Stage:: %fs\n",(float) (on1 - on0)/(CLOCKS_PER_SEC));
 		//printf("Time taken by Verify Stage:: %fs\n", (float) (ver1 - ver0)/(CLOCKS_PER_SEC));
-		ver = (((float)(ver1 - ver0)/(CLOCKS_PER_SEC))/(k-numberOfSCRAChunks))/trials;
-		on = (((float)(on1 - on0)/(CLOCKS_PER_SEC))/(k-numberOfSCRAChunks))/trials;
-		printf("\n%4d\t\t%.10ft\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t\n",k,(((float) (wsig1 - wsig0)/(CLOCKS_PER_SEC))/k)/trials,(((float) (wver1 - wver0)/(CLOCKS_PER_SEC))/k)/trials,(((float) (off1 - off0)/(CLOCKS_PER_SEC)))/trials,on,ver, (on+ver));
+		ver = (float) (ver1 - ver0)/(CLOCKS_PER_SEC);
+		on = (float) (on1 - on0)/(CLOCKS_PER_SEC);
+		printf("\n%4d\t\t%.10ft\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t%.10f\t\t\n",k,(((float) (wsig1 - wsig0)/(CLOCKS_PER_SEC))/k)/trials,(((float) (wver1 - wver0)/(CLOCKS_PER_SEC)))/trials,(((float) (off1 - off0)/(CLOCKS_PER_SEC)))/trials,on/trials,ver/trials, (on+ver)/trials);
 	}
 #if DEBUG
 	printf("\n\nKey: ");

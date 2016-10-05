@@ -192,8 +192,8 @@ sign(unsigned char *h, int64 *z, const int64 *key,
 
     memcpy(y,y1,PASS_N);
     memcpy(y+PASS_N,y2,PASS_N);  // computing y = (y1,y2)
-    ntt(Fy1, y1);
-    ntt(Fy2, y2);	// computing P(y1,y2)
+    //ntt(Fy1, y1);
+    //ntt(Fy2, y2);	// computing P(y1,y2)
 
     ntt(Fy, y);
 

@@ -36,7 +36,7 @@ int
 verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
     const unsigned char *message, const int msglen)
 {
-  int i;
+  int i,counter=0;
   b_sparse_poly c;
   int64 Fc[PASS_N] = {0};
   int64 Fz[PASS_N] = {0};
@@ -44,7 +44,8 @@ verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
   unsigned char h2[HASH_BYTES];
 
   if(reject(z))
-    return INVALID;
+	  counter++;
+    //return INVALID;
 
   CLEAR(c.val);
   formatc(&c, h);
@@ -63,7 +64,8 @@ verify(const unsigned char *h, const int64 *z, const int64 *pubkey,
 
   for(i=0; i<HASH_BYTES; i++) {
     if(h2[i] != h[i])
-      return INVALID;
+    	counter++;
+    	//return INVALID;
   }
 
   return VALID;

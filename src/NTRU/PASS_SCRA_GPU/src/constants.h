@@ -19,12 +19,14 @@
  *  along with CPASSREF.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+
+
 #ifndef CPASSREF_CONST_H_
 #define CPASSREF_CONST_H_
 
 /* Parameters */
 #ifndef PASS_N
-#define PASS_N 1153
+#define PASS_N 769
 #endif
 
 #if PASS_N == 433
