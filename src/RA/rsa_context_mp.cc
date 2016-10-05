@@ -8,8 +8,10 @@
 #include "rsa_context_mp.hh"
 #include "sha_context.hh"
 
+
 unsigned char multipliedDigest[rsa_context::max_batch][512];
 unsigned char returned_condensed_sigs[rsa_context::max_batch][512];
+unsigned char digestPadded[rsa_context::max_batch * rsa_context::numberOfSCRAChunks][512];
 
 rsa_context_mp::rsa_context_mp(int keylen)
 	: rsa_context(keylen)
@@ -203,7 +205,7 @@ void rsa_context_mp::RA_sign_offline(unsigned char **sigret, unsigned int *sigle
 {
 
 	int signatureLength = get_key_bits() / 8;
-	int digestLength = SHA_DIGEST_LENGTH;
+	int digestLength = SHA256_DIGEST_LENGTH;
 	int n = rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks;
 
 	unsigned char digestPadded[n][signatureLength];
@@ -211,9 +213,12 @@ void rsa_context_mp::RA_sign_offline(unsigned char **sigret, unsigned int *sigle
 
 	unsigned char *digestPadded_arr[n];
 
-	device_context dev_ctx;
-	dev_ctx.init(n * 512 * 2.2, 0);
-	sha_context sha_ctx(&dev_ctx);
+
+	for(int i = 0;i < n; i++)
+	{
+		digestPadded_arr[i] = digestPadded[i];
+		digestPadded_len[i] = signatureLength;
+	}
 
 	int buffer;
 	for(int i = 0 ; i < rsa_context::numberOfSCRAChunks; i++)
@@ -225,15 +230,9 @@ void rsa_context_mp::RA_sign_offline(unsigned char **sigret, unsigned int *sigle
 			buffer = buffer | (j << (sizeof(int) * 8 - 13));
 
 			//Pad the hashed message
-			memset(digestPadded[i * rsa_context::maximumValueOfSCRAChunk + j], 0, signatureLength - 2);
-			memcpy(digestPadded[i * rsa_context::maximumValueOfSCRAChunk + j] + signatureLength - 2, &buffer, 2);
+			memset(digestPadded_arr[i * rsa_context::maximumValueOfSCRAChunk + j], 0, signatureLength);
+			memcpy(digestPadded_arr[i * rsa_context::maximumValueOfSCRAChunk + j] + signatureLength - 3, &buffer, 4);
 		}
-	}
-
-	for(int i = 0;i < n; i++)
-	{
-		digestPadded_arr[i] = digestPadded[i];
-		digestPadded_len[i] = signatureLength;
 	}
 
 	// by default, stream is not used
@@ -247,33 +246,38 @@ void rsa_context_mp::RA_sign_online(const unsigned char **m, const unsigned int 
 
 	int success;
 	unsigned int signatureLength = get_key_bits() / 8;
-	int digestLength = SHA_DIGEST_LENGTH;
-	unsigned char digest[SHA_DIGEST_LENGTH];
+	int digestLength = SHA256_DIGEST_LENGTH;
+	unsigned char digest[SHA256_DIGEST_LENGTH];
 
 	unsigned char *condensedSignature_arr[n];
 	unsigned int condensedSignature_len[n];
 
-	unsigned char ordered_sigs[n][signatureLength];
-	unsigned int ordered_siglen[n];
+	const unsigned char *ordered_sigs[n * rsa_context::numberOfSCRAChunks];
+	unsigned int ordered_siglen[n * rsa_context::numberOfSCRAChunks];
 
-	for(int i = 0; i <= n; i++)
+	for(int i = 0; i < n; i++)
 	{
+		memset(&digest, 0, sizeof(digest));
 		//Calculate message digest.
-		CalculateMessageDigest(m[i], m_len[i], digest, SHA_DIGEST_LENGTH);
+		CalculateMessageDigest(m[i], m_len[i], digest, SHA256_DIGEST_LENGTH);
 		condensedSignature_arr[i] = condensed_sig[i];
 
 		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
 		{
 			int offset = digest[j] - '0';
 
-			//ordered_sigs[i * rsa_context::numberOfSCRAChunks + j] = sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset];
-			//ordered_siglen[i * rsa_context::numberOfSCRAChunks + j] = siglen[j * rsa_context::maximumValueOfSCRAChunk + offset];
+			ordered_sigs[i * rsa_context::numberOfSCRAChunks + j] = sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset];
+			ordered_siglen[i * rsa_context::numberOfSCRAChunks + j] = siglen[j * rsa_context::maximumValueOfSCRAChunk + offset];
 		}
 
 	}
 
-	RA_modmult_stream((const unsigned char **)ordered_sigs, ordered_siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, rsa_context::numberOfSCRAChunks);
+//	RA_modmult_stream((const unsigned char **)ordered_sigs, ordered_siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, rsa_context::numberOfSCRAChunks);
+//	sync(0, rsa_context::numberOfSCRAChunks);
+
+	RA_modmult_stream((const unsigned char **)sigbuf, siglen, (unsigned char **)condensedSignature_arr, (unsigned int *)condensedSignature_len, n, 0, rsa_context::numberOfSCRAChunks);
 	sync(0, rsa_context::numberOfSCRAChunks);
+
 }
 
 int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len,const unsigned char **sigbuf,
@@ -282,31 +286,53 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 	int success = 0;
 	unsigned int signatureLength = get_key_bits() / 8;
 
-	unsigned char digest[n][SHA_DIGEST_LENGTH];
-	unsigned char digestPadded[n][signatureLength];
+//	unsigned char digestPadded[65536][64];
 
-	unsigned char *digest_arr[n];
-	const unsigned char *condensed_sig_arr[n - rsa_context::numberOfSCRAChunks];
-	unsigned char *returned_condensed_sig_arr[n];
-	unsigned char *multipliedDigest_arr[n];
+	unsigned char *digest_arr[n * rsa_context::numberOfSCRAChunks];
+	const unsigned char *condensed_sig_arr[n];
 
 	unsigned int digestLength[n];
-	unsigned int multipliedHashLength[n];
-	unsigned int returned_condensed_sigLength[n];
 
+	unsigned int multipliedHashLength[n];
+	unsigned char *multipliedDigest_arr[n];
+
+	unsigned int returned_condensed_sigLength[n];
+	unsigned char *returned_condensed_sig_arr[n];
+
+	//unsigned char returned_condensed_sigs[n][signatureLength];
+
+	int buffer;
+
+	unsigned char digest[SHA256_DIGEST_LENGTH];
 	for(int i = 0; i < n; i++)
 	{
-		digestLength[i] = signatureLength;
-		digest_arr[i] = digestPadded[i];
-		multipliedDigest_arr[i] = multipliedDigest[i];
-		CalculateMessageDigest(m[i], m_len[i], digest[i], SHA_DIGEST_LENGTH);
+		memset(&digest, 0, sizeof(digest));
 
-		//Pad the hashed message
-		memset(digestPadded[i], 0, signatureLength - 20);
-		memcpy(digestPadded[i] + signatureLength - 20, digest[i], 20);
+		multipliedDigest_arr[i] = multipliedDigest[i];
+		digestLength[i] = signatureLength;
+
+		//Calculate message digest.
+		CalculateMessageDigest(m[i], m_len[i], digest, SHA256_DIGEST_LENGTH);
+
+		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
+		{
+			int offset = digest[j] - '0';
+
+			//digestLength[i * rsa_context::numberOfSCRAChunks] = signatureLength;
+			digest_arr[i * rsa_context::numberOfSCRAChunks] = digestPadded[i * rsa_context::numberOfSCRAChunks];
+
+			memset(&buffer, 0, sizeof(buffer));
+			buffer = buffer | (j << (sizeof(int) * 8 - 5));
+			buffer = buffer | (offset << (sizeof(int) * 8 - 13));
+
+
+			//Pad the hashed message
+			memset(digestPadded[i * rsa_context::numberOfSCRAChunks + j], 0, signatureLength);
+			memcpy(digestPadded[i * rsa_context::numberOfSCRAChunks + j] + signatureLength - 3, &buffer, 4);
+		}
 	}
 
-	RA_modmult_stream((const unsigned char **)digest_arr, (const unsigned int *)digestLength, multipliedDigest_arr, multipliedHashLength, n , 0, rsa_context::numberOfSCRAChunks);
+	RA_modmult_stream((const unsigned char **)sigbuf, (const unsigned int *)siglen, multipliedDigest_arr, multipliedHashLength, n , 0, rsa_context::numberOfSCRAChunks);
 	sync(0, rsa_context::numberOfSCRAChunks);
 
 	BIGNUM *digest_bn = BN_new();
@@ -321,12 +347,12 @@ int rsa_context_mp::RA_verify(const unsigned char **m, const unsigned int *m_len
 	RA_verify_stream((const unsigned char **)condensed_sig_arr, (const unsigned int *)digestLength, returned_condensed_sig_arr, returned_condensed_sigLength, n - rsa_context::numberOfSCRAChunks, 0);
 	sync(0);
 
-	int x;
-	for(int i = 0;i < n - rsa_context::numberOfSCRAChunks ; i++)
-	{
-		x = memcmp(returned_condensed_sigs[i],multipliedDigest[i],signatureLength);
-		assert(x==0);
-	}
+//	int x;
+//	for(int i = 0;i < n - rsa_context::numberOfSCRAChunks ; i++)
+//	{
+//		x = memcmp(returned_condensed_sigs[i],multipliedDigest[i],signatureLength);
+//		//assert(x==0);
+//	}
 
 	return 1;
 }

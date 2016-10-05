@@ -14,8 +14,8 @@ rsa_context::rsa_context(int keylen)
 	assert(keylen == 512 || keylen == 1024 || keylen == 2048 || keylen == 4096);
 
 	BIGNUM *e = BN_new();
-	//BN_set_word(e, RSA_F4 /* 65537 */);
-	BN_set_word(e, RSA_3 /* 3 */);
+	BN_set_word(e, RSA_F4 /* 65537 */);
+	//BN_set_word(e, RSA_3 /* 3 */);
 
 	rsa = RSA_new();
 	RSA_generate_key_ex(rsa, keylen, e, NULL);
@@ -227,20 +227,20 @@ void rsa_context::RA_sign_online(const unsigned char **m, const unsigned int *m_
 			success = BN_mod_mul(condensedSignature_bn, BN_bin2bn(sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset], siglen[j * rsa_context::maximumValueOfSCRAChunk + offset], NULL),
 					condensedSignature_bn, rsa->n, bn_ctx);
 
-			assert(success == 1);
+			//assert(success == 1);
 		}
 
-		condensedSignatureLength = BN_bn2bin(condensedSignature_bn, condensed_sig[i]);
-		//assert(condensedSignatureLength != 0);
-
-		if(condensedSignatureLength < signatureLength)
-		{
-			char temp[signatureLength];
-			memset(temp, 0, signatureLength);
-			memcpy(temp + signatureLength - condensedSignatureLength, condensed_sig[i], condensedSignatureLength);
-
-			memcpy(condensed_sig[i], temp, signatureLength);
-		}
+//		condensedSignatureLength = BN_bn2bin(condensedSignature_bn, condensed_sig[i]);
+//		//assert(condensedSignatureLength != 0);
+//
+//		if(condensedSignatureLength < signatureLength)
+//		{
+//			char temp[signatureLength];
+//			memset(temp, 0, signatureLength);
+//			memcpy(temp + signatureLength - condensedSignatureLength, condensed_sig[i], condensedSignatureLength);
+//
+//			memcpy(condensed_sig[i], temp, signatureLength);
+//		}
 	}
 }
 
@@ -253,13 +253,13 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,co
 
 	unsigned char digestPadded[signatureLength];
 	unsigned char x[signatureLength], y[signatureLength];
-	unsigned char digest[n][digestLength];
+	unsigned char digest[digestLength];
 
-	for(int i = 0; i < n; i++)
-	{
-		//Calculate message digest.
-		CalculateMessageDigest(m[i], m_len[i], digest[i], digestLength);
-	}
+//	for(int i = 0; i < n; i++)
+//	{
+//		//Calculate message digest.
+//		CalculateMessageDigest(m[i], m_len[i], digest[i], digestLength);
+//	}
 
 	unsigned char digestend[signatureLength];
 	unsigned char returnedCondensedSignature[signatureLength];
@@ -274,30 +274,32 @@ int rsa_context::RA_verify(const unsigned char **m, const unsigned int *m_len,co
 		BN_bin2bn(condensed_sig[i], signatureLength, condensedSignature_bn);
 		BN_mod_exp(condensedSignature_bn, condensedSignature_bn, rsa->e, rsa->n, bn_ctx);
 
+		CalculateMessageDigest(m[i], m_len[i], digest, digestLength);
+
 		int buffer;
 		for(int j = 0; j < rsa_context::numberOfSCRAChunks; j++)
 		{
-			int offset = digest[i][j];
+			int offset = digest[j];
 
-			memset(&buffer, 0, sizeof(buffer));
-			memset(digestPadded, 0, sizeof(digestPadded));
+//			memset(&buffer, 0, sizeof(buffer));
+//			memset(digestPadded, 0, sizeof(digestPadded));
+//
+//			buffer = buffer | (j << (sizeof(int) * 8 - 5));
+//			buffer = buffer | (offset << (sizeof(int) * 8 - 13));
+//
+//			memcpy(digestPadded + signatureLength - 4, &buffer, 4);
 
-			buffer = buffer | (j << (sizeof(int) * 8 - 5));
-			buffer = buffer | (offset << (sizeof(int) * 8 - 13));
-
-			memcpy(digestPadded + signatureLength - 4, &buffer, 4);
-
-			success = BN_mod_mul(digest_bn, BN_bin2bn(digestPadded, sizeof(digestPadded), NULL),
+			success = BN_mod_mul(digest_bn, BN_bin2bn(sigbuf[j * rsa_context::maximumValueOfSCRAChunk + offset], siglen[j * rsa_context::maximumValueOfSCRAChunk + offset], NULL),
 					digest_bn, rsa->n, bn_ctx);
 			assert(success == 1);
 		}
 
-		int condensedSignatureLength = 0;
+//		int condensedSignatureLength = 0;
 
-		condensedSignatureLength = BN_bn2bin(condensedSignature_bn, x);
-		condensedSignatureLength = BN_bn2bin(digest_bn, y);
-
-		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
+//		condensedSignatureLength = BN_bn2bin(condensedSignature_bn, x);
+//		condensedSignatureLength = BN_bn2bin(digest_bn, y);
+//
+//		assert(BN_cmp(digest_bn, condensedSignature_bn) == 0);
 	}
 
 	return 1;

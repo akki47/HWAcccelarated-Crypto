@@ -1,8 +1,8 @@
 #modify directory configuration below to match your configuration \
  if you want use system default openssl-dev installation then comment out the OPENSSL_DIR line
 OPENSSL_DIR = /usr/local/ssl
-CUDA_TOOLKIT_DIR = /usr/local/cuda-7.5
-CUDA_SDK_DIR = /usr/local/cuda-7.5
+CUDA_TOOLKIT_DIR = /usr/local/cuda-6.5
+CUDA_SDK_DIR = /usr/local/cuda-6.5
 
 #openssl config
 ifneq ($(OPENSSL_DIR), )
@@ -19,9 +19,9 @@ INC = $(OPENSSL_INCDIR)
 #CUDA related config 
 NVCC=nvcc
 NVCFLAGS= --ptxas-options=-v -O2 --use_fast_math
-NVINC = -I/usr/local/cuda-7.5/include -I$(CUDA_SDK_DIR)/samples/common/inc
+NVINC = -I/usr/local/cuda-6.5/include -I$(CUDA_SDK_DIR)/samples/common/inc
 
-CUDA_LIBDIR = -L$(CUDA_TOOLKIT_DIR)/lib64 -L/usr/lib/i386-linux-gnu -L/usr/local/cuda-7.5/lib64/stubs -L/usr/lib/x86_64-linux-gnu
+CUDA_LIBDIR = -L$(CUDA_TOOLKIT_DIR)/lib64 -L/usr/lib/i386-linux-gnu -L/usr/local/cuda-6.5/lib64/stubs -L/usr/lib/x86_64-linux-gnu
 CUDA_LIBS =  -lcuda -lcudart
 
 #below lines automatically detects the fermi devices using lspci command

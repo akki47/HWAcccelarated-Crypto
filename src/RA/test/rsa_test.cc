@@ -71,7 +71,7 @@ static void sign_test_latency(rsa_context *rsa, int signature_len, int numberOfC
 	{
 		unsigned char *ptext_arr[k];
 		unsigned char *ctext_arr[rsa_context::maximumValueOfSCRAChunk * rsa_context::numberOfSCRAChunks];
-		unsigned char *condensedSignature_arr[k];
+		unsigned char *condensedSignature_arr[4096];
 		//struct ThreadData data[NUMTHREADS];
 		//pthread_t thread[NUMTHREADS];
 
@@ -476,13 +476,13 @@ void sign_test_rsa_mp()
 	sign_test_latency(&rsa2048_mp, 2048, numberOfComponents);
 	//sign_test_correctness(&rsa2048_mp, 2048,  20);
 
-	//    printf("------------------------------------------\n");
-	//    printf("RSA4096, SIGNATURE, GPU (MP), random, NumberOfComponents=%d\n", numberOfComponents);
-	//    printf("------------------------------------------\n");
-	//    rsa_context_mp rsa4096_mp(4096);
-	//    rsa4096_mp.set_device_context(&dev_ctx);
-	//    sign_test_latency(&rsa4096_mp, 4096, numberOfComponents);
-	//    //sign_test_correctness(&rsa4096_mp, 4096, 20);
+	    printf("------------------------------------------\n");
+	    printf("RSA4096, SIGNATURE, GPU (MP), random, NumberOfComponents=%d\n", numberOfComponents);
+	    printf("------------------------------------------\n");
+	    rsa_context_mp rsa4096_mp(4096);
+	    rsa4096_mp.set_device_context(&dev_ctx);
+	    sign_test_latency(&rsa4096_mp, 4096, numberOfComponents);
+	    //sign_test_correctness(&rsa4096_mp, 4096, 20);
 }
 
 void sign_test_rsa_DynamicScheduler()
